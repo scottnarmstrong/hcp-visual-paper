@@ -100,7 +100,6 @@ function drawCutoffPanel(svg, x0, y0, w, h, {
   const g = group(x0, y0);
   svg.appendChild(g);
   g.appendChild(richText(w / 2, -8, '(b) cutoff and cells', { anchor: 'middle', size: 12, fill: COLOR.textDim }));
-  g.appendChild(texText(4, 12, '$\\qq$-coordinates', 'q-coordinates', { size: 9.5, fill: COLOR.textDim }));
 
   const { c, phi } = makeCutoff(ramp);
   const maxPhi = 1 / c;
@@ -164,10 +163,11 @@ function drawCutoffPanel(svg, x0, y0, w, h, {
   // for the label's text width, so it used to overlap the magnifier's
   // left border and its first curve/step segment.
   g.appendChild(texText(sqX + sq - 4, sliceY - 4, '$y=1/2$', 'y=1/2', { anchor: 'end', size: 9, fill: COLOR.textDim }));
-  // Right-aligned with the square (not centred on it), so that it clears the
-  // "q-coordinates" corner label at every H.
-  g.appendChild(texText(sqX + sq, sqY - 8, `cells of side $3^s=3^{t-H}$ $(${nCells}\\times${nCells})$`, `cells of side 3^s = 3^(t-H) (${nCells}×${nCells})`, {
-    anchor: 'end', size: 9.5, fill: COLOR.textDim,
+  // One label, wrapped to the square's width: the coordinates note and the cell
+  // count used to be two labels on nearly the same line, and they collided
+  // wherever the text rendered wider than it measured.
+  g.appendChild(texWrapped(sqX, 9, `$\\qq$-coordinates; cells of side $3^s=3^{t-H}$ $(${nCells}\\times${nCells})$`, `q-coordinates; cells of side 3^s = 3^(t-H) (${nCells}×${nCells})`, {
+    maxWidth: sq, size: 9.5, fill: COLOR.textDim, lineHeight: 11,
   }));
 
   // profile: phi(x, 0.5) smooth curve + cell averages step function.
