@@ -204,14 +204,20 @@ function drawHistogram(svg, x0, y0, w, h, state, comp) {
         }));
       }
     });
-    const offScaleNote = trueVals.some((v) => v > 1) ? ' (^ marks: off scale above 1, the true bound continues upward)' : '';
-    g.appendChild(texWrapped(
+    // Short note (the authors asked for shorter labels; the long form ran
+    // past the figure's right edge); the full sentence is the hover title.
+    const offScale = trueVals.some((v) => v > 1);
+    const offScaleNote = offScale ? ' (^: off scale above 1)' : '';
+    const boundLabel = svgEl('g', {});
+    if (offScale) boundLabel.appendChild(svgEl('title', {}, ['^ marks: off scale above 1, the true bound continues upward']));
+    boundLabel.appendChild(texWrapped(
       plotX0,
       10,
       `$12d^{3/2}\\cdot3^{r-j}$ (lemma, $d=2$) $\\approx${fmt(12 * 2 ** 1.5, 2)}\\cdot3^{r-j}$${offScaleNote}`,
       `12d^1.5 · 3^(r−j) (lemma, d=2) ≈ ${fmt(12 * 2 ** 1.5, 2)} · 3^(r−j)${offScaleNote}`,
-      { maxWidth: w - 20, size: 8.5, fill: COLOR.theorem, lineHeight: 10 },
+      { maxWidth: w - plotX0 - 4, size: 8.5, fill: COLOR.theorem, lineHeight: 10 },
     ));
+    g.appendChild(boundLabel);
   } else {
     const guidePts = scales.filter((r) => r < comp.cap).map((r) => [plotX0 + (scales.indexOf(r) + 1) * barGap, yAtClipped(comp.cRun * 3 ** r)]);
     if (guidePts.length) {
@@ -224,7 +230,7 @@ function drawHistogram(svg, x0, y0, w, h, state, comp) {
       10,
       `envelope $C\\cdot3^{r-j}$, $C$ fitted to this run: $C_{\\mathrm{run}}=${fmt(comp.cRun, 2)}$ (not a law for individual bars)`,
       `envelope C·3^(r−j), C fitted to this run: C_run = ${fmt(comp.cRun, 2)} (not a law for individual bars)`,
-      { maxWidth: w - 20, size: 8.5, fill: COLOR.theorem, lineHeight: 10 },
+      { maxWidth: w - plotX0 - 4, size: 8.5, fill: COLOR.theorem, lineHeight: 10 },
     ));
   }
 

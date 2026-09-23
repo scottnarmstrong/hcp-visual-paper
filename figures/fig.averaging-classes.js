@@ -168,8 +168,13 @@ function drawChildren(svg, x0, y0, w, h, state) {
       const dirX = p2[0] - p1[0];
       const dirY = p2[1] - p1[1];
       const len = Math.hypot(dirX, dirY) || 1;
-      const perpX = -dirY / len;
-      const perpY = dirX / len;
+      // The perpendicular is taken on the side pointing DOWN the page, so the
+      // bar and its label land below the dimension line, toward the free space
+      // under the parent (the class caption now sits above the plot, under the
+      // panel title, where a label pushed upward would collide with it).
+      const flip = dirX < 0 ? -1 : 1;
+      const perpX = (-dirY / len) * flip;
+      const perpY = (dirX / len) * flip;
       const barOffset = 16;
       const barPxLen = t.scale * 1; // "range of dependence 1" in the same units
       const bx0 = mid[0] + perpX * barOffset;
@@ -215,7 +220,9 @@ function drawChildren(svg, x0, y0, w, h, state) {
     g.appendChild(texText(4, h - 44, '$h=1$: one child per class', 'h=1: one child per class', { size: 9, fill: COLOR.textDim }));
   }
 
-  g.appendChild(texWrapped(4, h - 30, 'classes: residue of $w$ mod 3 (at most $3^d$)', 'classes: residue of w mod 3 (at most 3^d)', {
+  // Above the plot, under the panel title: at the bottom it collided with the
+  // "range of dependence 1" label once that label is pushed below the parent.
+  g.appendChild(texWrapped(4, 6, 'classes: residue of $w$ mod 3 (at most $3^d$)', 'classes: residue of w mod 3 (at most 3^d)', {
     maxWidth: w - 8, size: 9, fill: COLOR.textDim, lineHeight: 11,
   }));
 }
@@ -435,7 +442,7 @@ function drawInset(g, x0, y0, w, h, state) {
   const t = fitTransform({
     xMin: -extent, xMax: extent, yMin: -extent, yMax: extent,
   }, {
-    x0: 0, y0: 18, w, h: h * 0.55,
+    x0: 0, y0: 30, w, h: h * 0.55 - 12,
   }, { pad: 8 });
   const [cx, cy] = t.toPx([0, 0]);
   ig.appendChild(svgEl('circle', {

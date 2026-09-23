@@ -54,6 +54,17 @@ function drawClipArrow(g, x, yAtClip, label) {
 
 const DASH = { fluc: null, mean: '5,3', drift: '1,3' };
 
+/** The y-axis name, upright along the axis at the panel's left edge (left
+ * of the tick numbers). Above the plot it collided with the panel title,
+ * the "restart scale n" marker and the carried-history label. */
+function yAxisName(g, box, plot) {
+  const cx = box.x + 3;
+  const cy = plot.y + plot.h / 2;
+  d3TexLabel(g, {
+    x: cx, y: cy, anchor: 'middle', size: 8, fill: cssVar('--text-faint'), plain: true, transform: `rotate(-90, ${cx}, ${cy})`,
+  }, '$\\log_3(\\text{weight})$', 'log_3(weight)');
+}
+
 function drawPanelA(g, box, p) {
   d3TexLabel(g, {
     x: box.x, y: box.y, size: 12, weight: 600, fill: cssVar('--text'), plain: true,
@@ -81,9 +92,7 @@ function drawPanelA(g, box, p) {
   d3TexLabel(g, {
     x: plot.x + plot.w, y: plot.y + plot.h + 26, anchor: 'end', size: 8, fill: cssVar('--text-faint'), plain: true,
   }, 'lag $m-j$', 'lag m-j');
-  d3TexLabel(g, {
-    x: plot.x - 16, y: plot.y - 6, size: 8, fill: cssVar('--text-faint'), plain: true,
-  }, '$\\log_3(\\text{weight})$', 'log_3(weight)');
+  yAxisName(g, box, plot);
 
   const series = [
     {
@@ -187,21 +196,28 @@ function drawPanelB(g, box, p, mMinusJstar, nMinusJstar) {
   }
   const labelStep = Math.max(1, Math.round((m - jstar) / 5));
   for (let j = jstar; j <= m; j += labelStep) {
-    if (j === jstar || j === n || j === m) continue; // drawn as their own major ticks below
+    // drawn as their own major ticks below; also skipped when within 24
+    // units of one of them (their labels would run together)
+    if ([jstar, n, m].some((k) => Math.abs(x(j) - x(k)) < 24)) continue;
     d3TexLabel(g, {
       x: x(j), y: plot.y + plot.h + 11, anchor: 'middle', size: 6.5, fill: cssVar('--text-faint'), plain: true,
     }, `$j_*+${j - jstar}$`, `j_*+${j - jstar}`);
   }
+  // Coinciding scales share one label ("j_*=n", "n=m"): drawn separately
+  // they overprinted each other at n=j_* or n=m.
+  const majors = [];
   for (const [pos, label] of [[jstar, 'j_*'], [n, 'n'], [m, 'm']]) {
+    const same = majors.find((mk) => mk[0] === pos);
+    if (same) same[1] += `=${label}`; else majors.push([pos, label]);
+  }
+  for (const [pos, label] of majors) {
     g.append('line').attr('x1', x(pos)).attr('x2', x(pos)).attr('y1', plot.y + plot.h).attr('y2', plot.y + plot.h + 4)
       .attr('stroke', cssVar('--text-faint'));
     d3TexLabel(g, {
       x: x(pos), y: plot.y + plot.h + 14, anchor: 'middle', size: 8, fill: cssVar('--text-faint'),
     }, `$${label}$`, label);
   }
-  d3TexLabel(g, {
-    x: plot.x - 16, y: plot.y - 6, size: 8, fill: cssVar('--text-faint'), plain: true,
-  }, '$\\log_3(\\text{weight})$', 'log_3(weight)');
+  yAxisName(g, box, plot);
 
   // Carried history: ONE hatched block over [j_*, n] -- drawn even at the
   // allowed n=j_* setting (audit feedback: an earlier version only drew it
@@ -223,8 +239,14 @@ function drawPanelB(g, box, p, mMinusJstar, nMinusJstar) {
     g.append('rect').attr('x', x(jstar)).attr('y', carriedY - 5).attr('width', blockW).attr('height', 10)
       .attr('fill', `url(#${hatchId})`).attr('stroke', cssVar('--text-dim'))
       .append('title').text('history_qq(n), carried as a whole');
+    // Its name goes in the legend (right of the first legend row), with a
+    // hatched swatch: drawn over the block it ran into the "restart scale n"
+    // marker and, at n=j_*, past the figure's left edge.
+    const kx = box.x + 330;
+    g.append('rect').attr('x', kx).attr('y', box.y + 5).attr('width', 12).attr('height', 9)
+      .attr('fill', `url(#${hatchId})`).attr('stroke', cssVar('--text-dim'));
     d3TexLabel(g, {
-      x: x(jstar) + blockW / 2, y: carriedY - 9, anchor: 'middle', size: 7.5, fill: cssVar('--text-dim'), halo: true,
+      x: kx + 16, y: box.y + 12, size: 7.5, fill: cssVar('--text-dim'),
     }, '$\\history_{\\qq}(n)$, carried as a whole', 'history_{qq}(n), carried as a whole');
   }
 
@@ -265,8 +287,10 @@ function drawPanelB(g, box, p, mMinusJstar, nMinusJstar) {
   // Restart-scale marker.
   g.append('line').attr('x1', x(n)).attr('x2', x(n)).attr('y1', plot.y).attr('y2', plot.y + plot.h)
     .attr('stroke', cssVar('--text')).attr('stroke-dasharray', '2,2');
+  // Kept within the plot's width (centred on the marker otherwise), clear of
+  // the y-axis numbers at n=j_* and of the right edge at n=m.
   d3TexLabel(g, {
-    x: x(n), y: plot.y - 4, anchor: 'middle', size: 7.5, fill: cssVar('--text'), plain: true,
+    x: Math.min(Math.max(x(n), plot.x + 32), plot.x + plot.w - 32), y: plot.y - 4, anchor: 'middle', size: 7.5, fill: cssVar('--text'), plain: true,
   }, 'restart scale $n$', 'restart scale n');
 
   // Real typeset math (grid superscripts on P and Delta included), not raw

@@ -471,8 +471,10 @@ function drawPanelA(g, box, revealed) {
 
   // Current-scale labels and step-index ticks every 10 steps; for a long
   // (dense) run, every multiple of 10 that keeps about 15 labels or fewer,
-  // rather than dropping the labels altogether (fc.G1).
-  const labelEvery = 10 * Math.max(1, Math.ceil(revealed.length / 150));
+  // rather than dropping the labels altogether (fc.G1). The multiple also
+  // grows with the strip's width, at most one label per ~40px, so the
+  // "i=280"-style ticks never run into each other in a narrow card.
+  const labelEvery = 10 * Math.max(1, Math.ceil(revealed.length / 150), Math.ceil((revealed.length * 40) / (10 * box.w)));
   const cols = g.append('g').attr('class', 'cs-columns');
   revealed.forEach((rec, i) => {
     const cx0 = x(i);
@@ -619,7 +621,7 @@ function yLog(box, domain) {
 function drawPanelB(g, box, revealed, xScale, dense) {
   sectionTitle(g, 'Error + drift E_i', box.x, box.y + 8, 'Error + drift $E_i$');
   d3TexLabel(g, {
-    x: box.x, y: box.y + 18, size: 7, fill: cssVar('--text-faint'),
+    x: box.x, y: box.y + 22, size: 7, fill: cssVar('--text-faint'),
   }, '$E_i=\\mathcal P_{\\qq_i}(n_i;k_i)+D_{\\qq_i,j_*}(n_i)$', 'E_i = P_{q_i}(n_i;k_i) + D_{q_i,j_*}(n_i)');
   const y = yLog(box, [1e-3, 1e3]);
   numericYAxis(g, box, y, [1e-3, 1e-2, 0.1, 1, 10, 100, 1e3], (t) => t.toExponential(0), powerTick);
@@ -645,13 +647,14 @@ function drawPanelB(g, box, revealed, xScale, dense) {
 function drawPanelC(g, box, revealed, xScale) {
   sectionTitle(g, 'Distance to canonical metric μ_i', box.x, box.y + 8, 'Distance to canonical metric $\\mu_i$');
   d3TexLabel(g, {
-    x: box.x, y: box.y + 18, size: 7, fill: cssVar('--text-faint'),
+    x: box.x, y: box.y + 22, size: 7, fill: cssVar('--text-faint'),
   }, '$\\mu_i=|x_i-\\mathrm{target}_g(k_i)|$', 'μ_i = |x_i - target_g(k_i)|');
   const mu0 = revealed.length ? revealed[0].mu : 1;
   // Plot top left at box.y+22 used to butt straight up against the title
   // and mu_i formula rows above it, with no room for the "-eps" annotation
-  // below them; +34 opens a clear band for it.
-  const plotTop = box.y + 34;
+  // below them; +38 opens a clear band for it (the formula row sits at +22,
+  // clear of the title's subscript).
+  const plotTop = box.y + 38;
   const y = d3.scaleLinear().domain([0, Math.max(1e-6, 1.05 * mu0)]).range([box.y + box.h, plotTop]);
   numericYAxis(g, box, y, d3.ticks(0, mu0, 4), (t) => t.toFixed(2));
   const line = d3.line().x((_d, i) => xScale(i)).y((d) => y(d.mu)).curve(d3.curveStepAfter);
@@ -668,7 +671,7 @@ function drawPanelC(g, box, revealed, xScale) {
     const labelW = 90;
     const lx = clamp(px, box.x, box.x + box.w - labelW);
     d3TexLabel(g, {
-      x: lx, y: box.y + 28, size: 7.5, fill: cssVar('--text-dim'), plain: true,
+      x: lx, y: box.y + 32, size: 7.5, fill: cssVar('--text-dim'), plain: true,
     }, '$-\\varepsilon$ (up to target drift)', '-ε (up to target drift)');
   }
 }
@@ -709,7 +712,9 @@ function drawPanelE(g, box, revealed, dense, onHover, defaultI) {
   numericYAxis(g, box, y, [1e-3, 0.1, 1, 10, 1e3], (t) => t.toExponential(0), powerTick);
   const xTicks = d3.ticks(0, muMax, 4);
   for (const t of xTicks) {
-    g.append('text').attr('x', x(t)).attr('y', plotBottom + 11).attr('text-anchor', 'middle').attr('font-size', 7)
+    // The 0 tick starts AT the axis instead of centring on it, clear of the
+    // y-axis's bottom "10^-3" label just left of the corner.
+    g.append('text').attr('x', x(t)).attr('y', plotBottom + 11).attr('text-anchor', t === 0 ? 'start' : 'middle').attr('font-size', 7)
       .attr('fill', cssVar('--text-faint')).text(t.toFixed(2));
   }
   d3TexLabel(g, {

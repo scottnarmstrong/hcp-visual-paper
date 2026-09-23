@@ -100,18 +100,33 @@ function drawGeodesic(svg, x0, y0, w, h, s, st) {
     const mTheta = matMul(matMul(sqrtM, powSym(st.T, theta)), sqrtM);
     drawEllipseAt(mTheta, theta * st.D, COLOR.neutral, {});
   }
-  g.appendChild(richText(xAt(0.5 * st.D), rulerY - ellH - 8 - 22, 'points of the geodesic', { anchor: 'middle', size: 8, fill: COLOR.neutral }));
+  // Only while the geodesic points stand apart from m (near the target they
+  // sit under m's own ellipse, and the label would overprint it).
+  if (xAt(0.5 * st.D) - xAt(0) > 60) {
+    g.appendChild(richText(xAt(0.5 * st.D), rulerY - ellH - 8 - 22, 'points of the geodesic', { anchor: 'middle', size: 8, fill: COLOR.neutral }));
+  }
 
   const mxAt = drawEllipseAt(st.m, 0, COLOR.gridA, { emph: true });
   const targetX = drawEllipseAt(st.mStar, st.D, COLOR.theorem, { dashed: true, emph: true });
   const plusD = st.theta * st.D;
   const plusX = drawEllipseAt(st.mPlus, plusD, COLOR.gridB, { emph: true });
 
-  g.appendChild(texText(mxAt, rulerY + 32, '$\\m$', 'm', { anchor: 'middle', size: 10, fill: COLOR.gridA }));
-  g.appendChild(texText(targetX, rulerY + 32, '$\\m_*$', 'm_*', { anchor: 'middle', size: 10, fill: COLOR.theorem }));
-  if (Math.abs(plusD - st.D) > 1e-6) {
-    g.appendChild(texText(plusX, rulerY + 32, '$\\m_+$', 'm_+', { anchor: 'middle', size: 10, fill: COLOR.gridB }));
-  }
+  // Name labels under their ticks, spread apart (at least NAME_GAP between
+  // centres, in ruler order) when the points nearly coincide -- e.g. m and
+  // m_* once the target is within reach -- so the names never overprint.
+  const names = [
+    { x: mxAt, tex: '$\\m$', text: 'm', fill: COLOR.gridA },
+    { x: targetX, tex: '$\\m_*$', text: 'm_*', fill: COLOR.theorem },
+  ];
+  if (Math.abs(plusD - st.D) > 1e-6) names.push({ x: plusX, tex: '$\\m_+$', text: 'm_+', fill: COLOR.gridB });
+  const NAME_GAP = 18;
+  names.sort((a, b) => a.x - b.x);
+  const lx = names.map((n) => n.x);
+  for (let i = 1; i < lx.length; i += 1) lx[i] = Math.max(lx[i], lx[i - 1] + NAME_GAP);
+  const shift = Math.max(0, (lx[lx.length - 1] - names[names.length - 1].x) / 2);
+  names.forEach((n, i) => {
+    g.appendChild(texText(lx[i] - shift, rulerY + 32, n.tex, n.text, { anchor: 'middle', size: 10, fill: n.fill }));
+  });
 
   // bracket m .. m_+, given its own clear row well below the m/m_*/m_+
   // name labels (they used to sit only 4px apart and overlap).
@@ -119,8 +134,13 @@ function drawGeodesic(svg, x0, y0, w, h, s, st) {
   g.appendChild(svgEl('path', {
     d: `M${mxAt},${by} L${mxAt},${by + 6} L${plusX},${by + 6} L${plusX},${by}`, fill: 'none', stroke: COLOR.gridB, 'stroke-width': 1,
   }));
-  g.appendChild(texWrapped((mxAt + plusX) / 2, by + 20, '$d_{\\mathrm{pr}}([\\m],[\\m_+])=\\theta\\,d_{\\mathrm{pr}}([\\m],[\\m_*])\\leq\\varepsilon$', 'd_pr([m],[m_+]) = θ d_pr([m],[m_*]) ≤ ε', {
-    maxWidth: Math.max(plusX - mxAt + 160, 160), anchor: 'middle', size: 9, fill: COLOR.gridB, lineHeight: 11,
+  // Wide enough for the formula on one line, and centred no closer to the
+  // panel's edges than half that width (a short bracket at the left end
+  // used to wrap it and push it past the figure's left edge).
+  const brW = Math.max(plusX - mxAt + 160, 240);
+  const brX = Math.min(Math.max((mxAt + plusX) / 2, brW / 2), w - brW / 2);
+  g.appendChild(texWrapped(brX, by + 20, '$d_{\\mathrm{pr}}([\\m],[\\m_+])=\\theta\\,d_{\\mathrm{pr}}([\\m],[\\m_*])\\leq\\varepsilon$', 'd_pr([m],[m_+]) = θ d_pr([m],[m_*]) ≤ ε', {
+    maxWidth: brW, anchor: 'middle', size: 9, fill: COLOR.gridB, lineHeight: 11,
   }));
 
   if (st.D <= s.epsilon + 1e-9) {

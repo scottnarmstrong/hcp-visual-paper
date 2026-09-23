@@ -173,7 +173,10 @@ function drawPanelA(g, s) {
   // instead of one long diagonal run -- audit feedback: a single long
   // line reached far enough along the rotation to cross back UP into the
   // coloured band at one end, or into the "t" landmark/guide at the
-  // other.
+  // other. Rotated -90 degrees (was -28): an upright caption's horizontal
+  // extent stays inside its own band, so neighbouring captions no longer
+  // run into each other or across the stage-boundary guides when the bands
+  // are narrow (authors' report: overlapping ruler labels).
   const CAP_LINE_H = 9;
   for (const st of stages) {
     g.append('rect')
@@ -182,10 +185,14 @@ function drawPanelA(g, s) {
       .append('title').text(st.title);
     const capX = (x(st.from) + x(st.to)) / 2;
     const texLines = (st.capTex || st.cap).split('\n');
-    st.cap.split('\n').forEach((line, li) => {
-      const cy = bandY + bandH + 44 + li * CAP_LINE_H;
+    const capLines = st.cap.split('\n');
+    capLines.forEach((line, li) => {
+      // Upright lines sit side by side, centred on the band; +2.5 moves the
+      // glyphs (which stand on the rotated baseline, left of it) onto capX.
+      const lx = capX + 2.5 + (li - (capLines.length - 1) / 2) * CAP_LINE_H;
+      const cy = bandY + bandH + 51; // top end clear of the Θ_m label at +13
       d3TexLabel(g, {
-        x: capX, y: cy, anchor: 'middle', size: 7, fill: cssVar('--text-dim'), transform: `rotate(-28, ${capX}, ${cy})`,
+        x: lx, y: cy, anchor: 'middle', size: 7, fill: cssVar('--text-dim'), transform: `rotate(-90, ${lx}, ${cy})`,
       }, texLines[li], line);
     });
   }
