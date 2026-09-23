@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Homogenization at a polynomial scale in high contrast — visual companion</title>
+<meta name="description" content="An interactive companion to the paper by Armstrong, Kuusi and Loher: the dependency graph of the proofs, exact statements, step-by-step proofs, notation and interactive figures.">
+<!-- scripts/build.mjs's writeSiteAssets (tasks/p11-launch.md sec.4) rewrites
+     both tags above from content/site.yaml and appends canonical/Open
+     Graph/Twitter/favicon tags just before the closing head tag; this
+     file's own copies are the fallback for opening it unbuilt. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="vendor/katex.min.css">
+<link rel="stylesheet" href="app.css">
+<link rel="canonical" href="https://scottnarmstrong.github.io/hcp-visual-paper/">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/png" href="favicon.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Homogenization at a polynomial scale in high contrast — visual companion">
+<meta property="og:description" content="An interactive companion to the paper by Armstrong, Kuusi and Loher: the dependency graph of the proofs, exact statements, step-by-step proofs, notation and interactive figures.">
+<meta property="og:url" content="https://scottnarmstrong.github.io/hcp-visual-paper/">
+<meta property="og:image" content="https://scottnarmstrong.github.io/hcp-visual-paper/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Homogenization at a polynomial scale in high contrast — visual companion">
+<meta name="twitter:description" content="An interactive companion to the paper by Armstrong, Kuusi and Loher: the dependency graph of the proofs, exact statements, step-by-step proofs, notation and interactive figures.">
+<meta name="twitter:image" content="https://scottnarmstrong.github.io/hcp-visual-paper/og-image.png">
+</head>
+<body>
+<a class="skip-link" href="#panel">Skip to reading panel</a>
+
+<header class="topbar">
+  <button type="button" class="topbar__brand" aria-label="Show the welcome panel">
+    <span class="topbar__mark" aria-hidden="true">◇</span>
+    <div class="topbar__titles">
+      <span class="topbar__kicker">Visual paper</span>
+      <h1 class="topbar__title">Homogenization at a polynomial scale in high contrast</h1>
+    </div>
+  </button>
+  <div class="topbar__search">
+    <label class="sr-only" for="search-input">Search titles, labels and numbers</label>
+    <input id="search-input" type="text" placeholder="Search &ldquo;Whitney&rdquo;, l.projective.step, 3.2 &hellip;" autocomplete="off">
+    <div id="search-results" class="search-results" hidden></div>
+  </div>
+  <a id="topbar-arxiv-link" class="topbar__arxiv" href="#" hidden>arXiv:</a>
+  <div class="topbar__actions">
+    <span id="dev-indicator" class="badge badge--dev" hidden>dev</span>
+    <button id="theme-toggle" type="button" class="icon-button" aria-label="Toggle light/dark theme" title="Toggle theme">
+      <span class="theme-toggle__icon" aria-hidden="true">◐</span>
+    </button>
+  </div>
+</header>
+
+<nav class="tabbar" aria-label="Panes">
+  <button type="button" class="tabbar__btn is-active" data-pane="graph">Graph</button>
+  <button type="button" class="tabbar__btn" data-pane="panel">Reading panel</button>
+</nav>
+
+<main class="layout">
+  <section id="graph-pane" class="pane pane--graph" aria-label="Dependency graph">
+    <div id="cy" class="cy-canvas" tabindex="0" aria-label="Dependency graph. Plus and minus zoom, 0 fits the view."></div>
+    <div id="outline" class="outline" hidden></div>
+    <div class="graph-toolbar" role="toolbar" aria-label="Graph view">
+      <button type="button" class="graph-btn graph-btn--map" data-graph-action="whole-map" title="Back to the map of sections and theorems">Whole map</button>
+      <div class="graph-hops" role="group" aria-label="How far to follow links" data-graph-hops hidden>
+        <button type="button" class="graph-btn" data-graph-action="hops-1" aria-pressed="true">Direct links</button>
+        <button type="button" class="graph-btn" data-graph-action="hops-2" aria-pressed="false">One step further</button>
+      </div>
+      <p class="graph-hint" data-graph-hint>Click a section to open it, and again to close it. Click a result to see what it uses and what uses it.</p>
+    </div>
+    <div class="graph-zoom" role="toolbar" aria-label="Zoom" aria-orientation="vertical">
+      <button type="button" class="graph-btn graph-btn--icon" data-graph-action="zoom-in" aria-label="Zoom in" title="Zoom in (+)">+</button>
+      <button type="button" class="graph-btn graph-btn--icon" data-graph-action="zoom-out" aria-label="Zoom out" title="Zoom out (&minus;)">&minus;</button>
+      <button type="button" class="graph-btn graph-btn--icon" data-graph-action="fit" aria-label="Fit the view" title="Fit the view (0)"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
+      <button type="button" class="graph-btn graph-btn--icon" data-graph-action="zoom-selection" aria-label="Zoom to the selection" title="Zoom to the selection"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="5.2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="1.8" fill="currentColor"/></svg></button>
+    </div>
+    <div class="graph-legend">
+      <div class="graph-legend__row">
+        <span aria-hidden="true"><i class="legend-swatch legend-swatch--theorem"></i>Theorem</span>
+        <span aria-hidden="true"><i class="legend-swatch legend-swatch--section"></i>Section</span>
+        <span aria-hidden="true"><i class="legend-swatch legend-swatch--result"></i>Lemma / Proposition</span>
+        <span aria-hidden="true"><i class="legend-swatch legend-swatch--ext"></i>External input</span>
+        <span aria-hidden="true"><i class="legend-swatch legend-swatch--akhc"></i>[AK25] result</span>
+        <span aria-hidden="true"><i class="legend-swatch legend-swatch--background"></i>Background</span>
+      </div>
+      <div class="graph-legend__row">
+        <span class="graph-legend__key">A &rarr; B: A is used in the proof of B</span>
+        <label class="graph-legend__toggle"><input type="checkbox" data-graph-akhc> Show [AK25] links</label>
+      </div>
+    </div>
+  </section>
+
+  <section id="panel" class="pane pane--panel" aria-label="Reading panel" tabindex="-1">
+    <div id="panel-content" class="panel-content">
+      <div class="panel-empty">
+        <p>Select a node in the graph, or search above, to read its statement and proof.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="notation-popover" class="notation-popover" hidden role="dialog" aria-label="Notation"></div>
+
+<dialog id="figure-modal" class="figure-modal" aria-labelledby="figure-modal-title">
+  <div class="figure-modal__head">
+    <h2 id="figure-modal-title" class="figure-modal__title"></h2>
+    <button type="button" class="icon-button figure-modal__close" aria-label="Close">&times;</button>
+  </div>
+  <figure id="figure-modal-figure" class="figure-modal__figure"></figure>
+</dialog>
+
+<script src="vendor/cytoscape.min.js"></script>
+<script src="vendor/cytoscape-dagre.min.js"></script>
+<script src="vendor/d3.min.js"></script>
+<script src="vendor/katex.min.js"></script>
+<script src="macros.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
