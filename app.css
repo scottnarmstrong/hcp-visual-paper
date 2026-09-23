@@ -651,3 +651,12 @@ body[data-resizing] .pane { pointer-events: none; }
 @media (max-width: 700px) {
   .graph-btn--expand { display: none; }
 }
+
+/* The desktop layout is an app shell: only the panes scroll, never the page. Without
+   this, at some browser zoom levels the graph canvas (sized in whole pixels) overflows
+   its fractional-pixel pane by a pixel, the page's scrollbars appear, the graph shrinks
+   and re-fits, the scrollbars disappear, and the page shakes. */
+@media (min-width: 701px) {
+  html, body { overflow: hidden; }
+  .pane--graph, .cy-canvas { overflow: hidden; }
+}

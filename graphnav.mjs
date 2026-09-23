@@ -1232,7 +1232,17 @@ export function createGraphController(opts) {
     clearTimeout(refitTimer);
     refitTimer = setTimeout(() => fitView(false), 80);
   }
-  if (typeof ResizeObserver === 'function') new ResizeObserver(() => resize()).observe(container);
+  // Only a real change of size (a whole pixel or more) re-fits: sub-pixel jitter at
+  // fractional browser zoom must not start a resize -> re-fit -> resize loop.
+  let lastSize = { w: -1, h: -1 };
+  if (typeof ResizeObserver === 'function') {
+    new ResizeObserver(() => {
+      const w = container.clientWidth; const h = container.clientHeight;
+      if (Math.abs(w - lastSize.w) < 1 && Math.abs(h - lastSize.h) < 1) return;
+      lastSize = { w, h };
+      resize();
+    }).observe(container);
+  }
 
   let fontGen = 0;
   function refreshStyle() { cy.style(buildStylesheet(cssVar, fontGen)); }
