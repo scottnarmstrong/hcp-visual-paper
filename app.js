@@ -201,7 +201,7 @@ function welcomePanelHtml(data) {
       <div class="prose">
         <p>An interactive companion to the paper. The graph shows how the proofs are put together: the paper's sections, their subsections, and the individual lemmas, propositions, definitions and labelled estimates, with an arrow from each result to the results whose proofs use it. Click a section to open it, and click a result to read it here.</p>
         <p>Each result has a short summary, the exact statement from the paper, what it uses and what uses it, and, where the paper gives one, its proof: a proof idea, then numbered steps, each with a one-line summary and the paper's own text. Click a highlighted symbol in any formula to see its definition.</p>
-        <p>Everything shown is the paper's own text, text quoted from the earlier paper [AK25] that it cites, or a summary. The only mathematics that appears in neither paper is in nodes marked <em>Background</em>, which state facts the paper takes from [AK25]. Each summary or background sentence was checked, against the passages it cites, by an independent AI auditor that did not write it. A <strong>Lean ✓</strong> badge marks a result covered by the Lean formalization and links to it.</p>
+        <p>Everything shown is the paper's own text, text quoted from the earlier paper [AK25] that it cites, or a summary. The only mathematics that appears in neither paper is in nodes marked <em>Background</em>, which state facts the paper takes from [AK25]. Each summary or background sentence was checked, against the passages it cites, by an independent AI auditor that did not write it. A green ✓ on a box in the graph, and a <strong>Lean ✓</strong> badge above its statement, mark a result or definition covered by the Lean formalization; the badge links to it.</p>
       </div>
       ${citeLine}
       <div class="welcome-panel__actions">${theoremAButton}${section6Button}</div>
@@ -909,7 +909,7 @@ function buildOutline(data) {
     return `<ul>${kids.map((n) => `
       <li class="${n.kind === 'external' ? 'outline__ext' : ''}">
         <button type="button" data-id="${escapeHtml(n.id)}">
-          <span class="outline__num">${escapeHtml(plainText(n.numberHtml))}</span>${escapeHtml(plainText(n.titleHtml) || n.id)}
+          <span class="outline__num">${escapeHtml(plainText(n.numberHtml))}</span>${escapeHtml(plainText(n.titleHtml) || n.id)}${n.lean ? '<span class="lean-check" title="Formalized in Lean">&#10003;</span>' : ''}
         </button>
         ${renderLevel(n.id)}
       </li>`).join('')}</ul>`;

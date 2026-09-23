@@ -21,6 +21,7 @@
   --accent-tint: #f4e3d6;
   --accent-2: #2c6e68;
   --accent-2-tint: #dcece9;
+  --lean: #1f8a3b;
   --draft: #8a5b12;
   --draft-tint: #f2e6cc;
   /* fig.retained-histories' third data-series role ("fluc"): the shared
@@ -66,6 +67,7 @@
     --accent-tint: #3a2a1e;
     --accent-2: #6cbdb5;
     --accent-2-tint: #1c3230;
+  --lean: #4cc76a;
     --draft: #e0b158;
     --draft-tint: #3a2f18;
     --series-violet: #b39ddb;
@@ -97,6 +99,7 @@
   --accent-tint: #3a2a1e;
   --accent-2: #6cbdb5;
   --accent-2-tint: #1c3230;
+  --lean: #4cc76a;
   --draft: #e0b158;
   --draft-tint: #3a2f18;
   --series-violet: #b39ddb;
@@ -197,7 +200,7 @@ button.topbar__brand {
 }
 .badge--dev { background: var(--accent); color: #fff; }
 .badge--draft { background: var(--draft-tint); color: var(--draft); }
-.badge--lean { background: var(--accent-2-tint); color: var(--accent-2); font-family: var(--font-mono); text-transform: none; }
+.badge--lean { background: color-mix(in srgb, var(--lean) 14%, transparent); color: var(--lean); font-family: var(--font-mono); text-transform: none; }
 .badge--kind { background: var(--surface-2); color: var(--text-dim); }
 .badge--audit-none { background: var(--surface-2); color: var(--text-faint); }
 
@@ -635,3 +638,6 @@ body[data-resizing] .pane { pointer-events: none; }
   .pane-divider, .reading-graph-toggle { display: none; }
   .reading-btn { height: 28px; }
 }
+
+.legend-swatch--lean { background: var(--lean); border-radius: 50%; }
+.lean-check { color: var(--lean); font-weight: 700; margin-left: 4px; }

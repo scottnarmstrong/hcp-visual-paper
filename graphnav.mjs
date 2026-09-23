@@ -578,12 +578,19 @@ function nodeClasses(n) {
   if (n.level === 'L0' && n.kind !== 'section' && n.kind !== 'external') classes.push('theorem');
   else classes.push(`kind-${n.kind}`);
   if (n.cluster) classes.push(`cluster-${n.cluster}`);
+  if (n.lean) classes.push('lean');
   return classes;
 }
 
 /** `fontGen` > 0 adds a never-installed family name to the stack: it changes
  * nothing on screen, but gives every label a new style key, so cytoscape
  * re-measures and redraws labels it cached before the web font arrived. */
+/** A filled check-circle in `color`, as a data URI (the Lean badge on a graph box). */
+export function leanCheckSvg(color) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="${color}" stroke="#ffffff" stroke-width="1.5"/><path d="M5.6 10.4l2.9 2.9 5.9-6.2" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
 function buildStylesheet(cssVar, fontGen = 0) {
   const font = `IBM Plex Sans, ${fontGen ? `hcp-font-${fontGen}, ` : ''}system-ui, sans-serif`;
   return [
@@ -618,6 +625,15 @@ function buildStylesheet(cssVar, fontGen = 0) {
     { selector: 'node.kind-akhc', style: { 'background-color': cssVar('--akhc-tint'), 'border-color': cssVar('--akhc'), 'border-style': 'dotted', 'font-style': 'normal' } },
     { selector: 'node.kind-background', style: { 'background-color': cssVar('--background-node-tint'), 'border-color': cssVar('--background-node'), 'border-style': 'dashed', 'font-style': 'normal' } },
     { selector: 'node.collapsed', style: { 'border-width': 2.5 } },
+    // Lean-formalized: a green check-circle on the box's top-right corner.
+    { selector: 'node.lean', style: {
+      'background-image': leanCheckSvg(cssVar('--lean')),
+      'background-width': 18, 'background-height': 18,
+      'background-position-x': '100%', 'background-position-y': '0%',
+      'background-offset-x': 9, 'background-offset-y': -9,
+      'background-clip': 'none', 'background-image-containment': 'over', 'bounds-expansion': 10,
+      'background-image-opacity': 1,
+    } },
     { selector: 'node.context', style: { opacity: 0.72, 'border-width': 1.5 } },
     { selector: 'node:parent', style: {
       'text-valign': 'top', 'text-halign': 'center', 'text-margin-y': -4, 'text-events': 'yes',
