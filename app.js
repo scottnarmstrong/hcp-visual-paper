@@ -74,7 +74,7 @@ function initReading() {
   try {
     initReadingMode({
       onLayoutChange: (reason) => {
-        if (reason !== 'split' && reason !== 'graph-shown') return;
+        if (!['split', 'graph-shown', 'graph-expanded', 'graph-restored'].includes(reason)) return;
         requestAnimationFrame(() => withGraph((g) => g.resize({ refit: true })));
       },
     });

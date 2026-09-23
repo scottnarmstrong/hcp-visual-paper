@@ -641,3 +641,13 @@ body[data-resizing] .pane { pointer-events: none; }
 
 .legend-swatch--lean { background: var(--lean); border-radius: 50%; }
 .lean-check { color: var(--lean); font-weight: 700; margin-left: 4px; }
+
+/* Expanded graph (readingmode.mjs): the graph takes the whole width. */
+@media (min-width: 701px) {
+  body[data-graph-expanded] .pane--panel,
+  body[data-graph-expanded] .pane-divider { display: none; }
+  body[data-graph-expanded] .pane--graph { flex: 1 1 auto; border-right: 0; }
+}
+@media (max-width: 700px) {
+  .graph-btn--expand { display: none; }
+}

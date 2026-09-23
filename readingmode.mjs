@@ -131,6 +131,7 @@ export function initReadingMode({
   const resetBtn = doc.querySelector('[data-reading="text-reset"]');
   const largerBtn = doc.querySelector('[data-reading="text-larger"]');
   const textGroup = doc.querySelector('[data-reading="text-size"]');
+  const expandBtn = doc.querySelector('[data-reading="expand-graph"]');
 
   const st = readSettings(storage);
   const isDesktop = () => {
@@ -225,6 +226,7 @@ export function initReadingMode({
   }
   function setGraphHidden(hidden) {
     st.graphHidden = !!hidden;
+    if (st.graphHidden && expanded) setGraphExpanded(false);
     applyGraphHidden();
     if (st.graphHidden) storage.set(STORAGE_KEYS.graphHidden, '1');
     else storage.remove(STORAGE_KEYS.graphHidden);
@@ -238,6 +240,29 @@ export function initReadingMode({
     if (doc.querySelector('dialog[open]')) return;
     e.preventDefault();
     setGraphHidden(!st.graphHidden);
+  });
+
+  // ---- expand the graph to the full width --------------------------------------
+  // Not remembered: a reader who expands the graph to look around comes back to
+  // the split they had. Esc, `f` or the button returns.
+  let expanded = false;
+  function setGraphExpanded(on) {
+    expanded = !!on;
+    if (expanded && st.graphHidden) setGraphHidden(false);
+    if (expanded) body.setAttribute('data-graph-expanded', '');
+    else body.removeAttribute('data-graph-expanded');
+    if (expandBtn) {
+      expandBtn.setAttribute('aria-pressed', expanded ? 'true' : 'false');
+      expandBtn.setAttribute('aria-label', expanded ? 'Show the reading panel again' : 'Expand the graph to the full width');
+      expandBtn.title = expanded ? 'Show the reading panel again (f or Esc)' : 'Expand the graph (f); Esc to return';
+    }
+    notify(expanded ? 'graph-expanded' : 'graph-restored');
+  }
+  if (expandBtn) expandBtn.addEventListener('click', () => setGraphExpanded(!expanded));
+  doc.addEventListener('keydown', (e) => {
+    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (isTypingTarget(e.target) || !isDesktop() || doc.querySelector('dialog[open]')) return;
+    if (e.key === 'f') { e.preventDefault(); setGraphExpanded(!expanded); } else if (e.key === 'Escape' && expanded) { e.preventDefault(); setGraphExpanded(false); }
   });
 
   // ---- text size -------------------------------------------------------------
@@ -272,6 +297,8 @@ export function initReadingMode({
     get state() { return { ...st }; },
     setSplit(pct) { setSplit(pct); notify('split'); },
     setGraphHidden,
+    setGraphExpanded,
+    get graphExpanded() { return expanded; },
     setTextScale,
   };
 }
