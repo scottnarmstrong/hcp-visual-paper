@@ -102,7 +102,7 @@ export function buildGraphIndex(data) {
     if (!nodes.has(e.from) || !nodes.has(e.to) || e.from === e.to) continue;
     const key = `${e.from}\u0000${e.to}`;
     const prev = byPair.get(key);
-    if (!prev) byPair.set(key, { from: e.from, to: e.to, kind: e.kind });
+    if (!prev) byPair.set(key, { from: e.from, to: e.to, kind: e.kind, mapVia: e.mapVia || null });
     else if ((EDGE_KIND_RANK[e.kind] ?? 0) > (EDGE_KIND_RANK[prev.kind] ?? 0)) prev.kind = e.kind;
   }
   const edges = [...byPair.values()];
@@ -192,6 +192,9 @@ export function overviewGraph(index, expanded, { showAkhc = false, refs = true, 
     const a0 = index.nodes.get(e.from);
     const b0 = index.nodes.get(e.to);
     if (e.lifted || (!showAkhc && (a0.akhc || b0.akhc))) continue;
+    // A proof edge whose proof sits in another box is drawn through that box instead
+    // (the build adds the box's own edges; scripts/lib/assembleGraph.mjs, proof homes).
+    if (e.mapVia) continue;
     const a = rep(e.from);
     const b = rep(e.to);
     if (a === b || ancestorsOf(index, a).includes(b) || ancestorsOf(index, b).includes(a)) continue;
