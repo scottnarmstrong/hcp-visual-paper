@@ -6,6 +6,7 @@
 
 import { notationKeyFromClassName, getNotationEntry, renderNotationCard } from './notation.mjs';
 import { createGraphController } from './graphnav.mjs';
+import { initReadingMode } from './readingmode.mjs';
 
 // vendor/cytoscape-dagre.min.js is loaded as a classic <script> tag before
 // this module and attaches a plain global; cytoscape only gains the `dagre`
@@ -58,6 +59,28 @@ function showPanelTab() {
   document.querySelectorAll('.tabbar__btn').forEach((b) => {
     b.classList.toggle('is-active', b.dataset.pane === 'panel');
   });
+}
+
+// ---------------------------------------------------------------------------
+// Reading mode (tasks/p13-reading-mode.md, site/readingmode.mjs): the
+// divider, "Hide graph" and the text size. Whenever the graph pane settles
+// at a new size -- the divider let go, or the graph shown again -- the
+// canvas is resized and re-fitted; while hidden, routes still update the
+// panel and the graph (at zero size) keeps a pending fit for when it is
+// back. The D3 figures in the panel follow their own mounts' size (each
+// either scales with its viewBox or re-lays out from svgkit's watchResize).
+// ---------------------------------------------------------------------------
+function initReading() {
+  try {
+    initReadingMode({
+      onLayoutChange: (reason) => {
+        if (reason !== 'split' && reason !== 'graph-shown') return;
+        requestAnimationFrame(() => withGraph((g) => g.resize({ refit: true })));
+      },
+    });
+  } catch (err) {
+    console.warn(`Reading-mode controls unavailable: ${err && err.message}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -805,6 +828,18 @@ function initSearch(data) {
 // ---------------------------------------------------------------------------
 // Notation popovers
 // ---------------------------------------------------------------------------
+/** Below the clicked symbol, kept inside the window: the popover's width
+ * follows the reading text size (tasks/p13-reading-mode.md), so it is
+ * measured once shown rather than assumed. */
+function placeNotationPopover(pop, el) {
+  const rect = el.getBoundingClientRect();
+  pop.style.left = '0px';
+  pop.style.top = `${rect.bottom + 6}px`;
+  pop.hidden = false;
+  const w = pop.offsetWidth || 330;
+  pop.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - w - 8))}px`;
+}
+
 function initNotationPopovers(data) {
   const pop = document.getElementById('notation-popover');
   document.getElementById('panel-content').addEventListener('click', (e) => {
@@ -817,10 +852,7 @@ function initNotationPopovers(data) {
     if (!key) return;
     const entry = getNotationEntry(data.notation, key);
     pop.innerHTML = renderNotationCard(key, entry);
-    const rect = el.getBoundingClientRect();
-    pop.style.left = `${Math.min(rect.left, window.innerWidth - 330)}px`;
-    pop.style.top = `${rect.bottom + 6}px`;
-    pop.hidden = false;
+    placeNotationPopover(pop, el);
     e.stopPropagation();
   });
   pop.addEventListener('click', (e) => {
@@ -841,6 +873,7 @@ function initNotationPopovers(data) {
 async function main() {
   initTheme();
   initTabs();
+  initReading();
   initBrandHome();
   if (state.devMode) document.getElementById('dev-indicator').hidden = false;
 

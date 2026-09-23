@@ -44,6 +44,12 @@
   <a id="topbar-arxiv-link" class="topbar__arxiv" href="#" hidden>arXiv:</a>
   <div class="topbar__actions">
     <span id="dev-indicator" class="badge badge--dev" hidden>dev</span>
+    <div class="reading-size" role="group" aria-label="Text size" data-reading="text-size">
+      <button type="button" class="reading-btn reading-size__btn" data-reading="text-smaller" aria-label="Smaller text" title="Smaller text">A&minus;</button>
+      <button type="button" class="reading-btn reading-size__btn reading-size__reset" data-reading="text-reset" aria-label="Text size 100%; reset to 100%" title="Text size 100% (click to reset)">A</button>
+      <button type="button" class="reading-btn reading-size__btn" data-reading="text-larger" aria-label="Larger text" title="Larger text">A+</button>
+    </div>
+    <button type="button" class="reading-btn reading-graph-toggle" data-reading="toggle-graph" aria-pressed="false" title="Hide the dependency graph (g)">Hide graph</button>
     <button id="theme-toggle" type="button" class="icon-button" aria-label="Toggle light/dark theme" title="Toggle theme">
       <span class="theme-toggle__icon" aria-hidden="true">◐</span>
     </button>
@@ -88,6 +94,8 @@
       </div>
     </div>
   </section>
+
+  <div class="pane-divider" role="separator" tabindex="0" aria-orientation="vertical" aria-controls="panel" aria-label="Resize the reading panel (arrow keys; double-click to reset)" aria-valuemin="25" aria-valuemax="85" aria-valuenow="40"></div>
 
   <section id="panel" class="pane pane--panel" aria-label="Reading panel" tabindex="-1">
     <div id="panel-content" class="panel-content">

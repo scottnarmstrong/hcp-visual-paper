@@ -1204,11 +1204,15 @@ export function createGraphController(opts) {
   cy.on('dragpan pinchzoom scrollzoom', () => { st.userMoved = true; });
 
   /** The canvas changed size (window resize, phone <-> desktop): re-fit,
-   * unless the reader has zoomed or panned by hand since the last fit. */
+   * unless the reader has zoomed or panned by hand since the last fit.
+   * `{ refit: true }` (the reading-mode divider settling, or the graph shown
+   * again after being hidden -- tasks/p13-reading-mode.md) re-fits anyway,
+   * or as soon as the canvas has a size again. */
   let refitTimer = null;
-  function resize() {
+  function resize({ refit = false } = {}) {
     cy.resize();
-    if (!hasSize() || (st.userMoved && !st.pendingFit)) return;
+    if (!hasSize()) { if (refit) st.pendingFit = true; return; }
+    if (st.userMoved && !st.pendingFit && !refit) return;
     clearTimeout(refitTimer);
     refitTimer = setTimeout(() => fitView(false), 80);
   }
