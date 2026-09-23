@@ -121,21 +121,20 @@ function drawPanelA(g, s) {
       title: 'ceil(B log_3(2+Π))',
     },
     {
-      from: s.R, to: s.n0, op: 0.52, cap: 'init (Euclidean)', title: 'initialization (Euclidean grid)',
+      from: s.R, to: s.n0, op: 0.52, cap: 'init', title: 'initialization (Euclidean grid)',
     },
     {
       from: s.n0,
       to: s.t,
       op: 0.7,
-      cap: 'global selection: steps\nof a number of scales\nindependent of Π',
-      capTex: 'global selection: steps\nof a number of scales\nindependent of $\\Pi$',
+      cap: 'global selection',
       title: 'global selection: steps of a number of scales independent of Π',
     },
     {
       from: s.t,
       to: s.mEnt,
       op: 0.88,
-      cap: 'response and transfer\nto Euclidean cubes',
+      cap: 'response + transfer',
       title: 'response and transfer to Euclidean cubes',
     },
   ];
