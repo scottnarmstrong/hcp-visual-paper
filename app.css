@@ -239,25 +239,45 @@ button.topbar__brand {
 .outline .outline__ext button { color: var(--text-dim); font-style: italic; }
 .outline__num { font-family: var(--font-mono); color: var(--text-faint); margin-right: 6px; }
 
+/* Bottom-right (tasks/p18-legend.md), not bottom-left: that is where the
+   essentials whole map's band labels sit (in the margin outside the bands),
+   and reserving room for the legend there this route much of the fitted
+   zoom (insets() reserves room for the legend by its own current side). */
 .graph-legend {
-  position: absolute; left: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 4px;
-  align-items: flex-start; width: fit-content; max-width: calc(100% - 24px);
+  position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 4px;
+  align-items: flex-start; width: fit-content; max-width: min(300px, calc(100% - 24px));
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 6px 10px; font-size: 12px; color: var(--text-dim);
 }
+/* The "Legend" toggle (tasks/p18-legend.md): collapsed, only the head shows, so
+   the legend never covers much of the graph. Remembered via data-graph-legend
+   -- pane.dataset.legendCollapsed (localStorage behind try/catch). */
+.graph-legend__head {
+  font: inherit; font-size: 12px; font-weight: 600; color: var(--text); background: none; border: 0;
+  padding: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+}
+.graph-legend__chevron {
+  display: inline-block; width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent;
+  border-top: 5px solid var(--text-dim); transition: transform 150ms;
+}
+.pane--graph[data-legend-collapsed="true"] .graph-legend__chevron { transform: rotate(-90deg); }
+.pane--graph[data-legend-collapsed="true"] .graph-legend__body { display: none; }
+.graph-legend__body { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
 .graph-legend__row { display: flex; gap: 4px 12px; flex-wrap: wrap; align-items: center; }
 .graph-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .graph-legend__key { color: var(--text); }
 .graph-legend__toggle {
   display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text);
-  padding-left: 12px; border-left: 1px solid var(--border);
 }
 .graph-legend__toggle input { margin: 0; accent-color: var(--akhc); }
 .legend-swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-.legend-swatch--theorem { background: var(--accent); }
-.legend-swatch--section { background: var(--text-faint); }
-.legend-swatch--result { background: var(--accent-2); }
-.legend-swatch--ext { background: var(--border); border: 1px solid var(--text-faint); }
+/* Swatches mirror the real cytoscape styles in site/graphnav.mjs's buildStylesheet
+   -- fill, border colour and border style match exactly (tasks/p18-legend.md). */
+.legend-swatch--theorem { background: var(--accent); border: 1px solid var(--accent-strong); }
+.legend-swatch--section { background: var(--surface-2); border: 1px solid var(--text-faint); }
+.legend-swatch--subsection { background: var(--surface); border: 1px dashed var(--text-faint); }
+.legend-swatch--result { background: var(--accent-2-tint); border: 1px solid var(--accent-2); }
+.legend-swatch--ext { background: var(--surface); border: 1px dotted var(--text-faint); }
 
 /* Graph controls (tasks/p8-graph-navigation.md): view switch and hint at the
    top left, zoom at the top right. */
@@ -375,6 +395,22 @@ button.topbar__brand {
 .welcome-panel__button:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
 .welcome-panel__button--ghost { background: transparent; color: var(--text); border-color: var(--border); }
 .welcome-panel__button--ghost:hover { background: var(--surface-2); }
+
+/* ---------- "How to read the graph" (tasks/p18-legend.md): reuses the graph
+   legend's own swatch/arrow CSS classes, so this and the legend never drift
+   apart. ---------- */
+.welcome-panel__how-to-read { margin-top: 24px; }
+.how-to-read__list { list-style: none; margin: 10px 0 16px; padding: 0; }
+.how-to-read__list li {
+  display: flex; align-items: flex-start; gap: 8px; margin: 0 0 7px;
+  font-size: 0.9em; color: var(--text-dim); line-height: 1.4;
+}
+.how-to-read__list li i { margin-top: 4px; flex: none; }
+@media (min-width: 560px) {
+  .how-to-read__list { columns: 2; column-gap: 24px; }
+  .how-to-read__list li { break-inside: avoid; }
+}
+.welcome-panel__how-to-read > p { font-size: 0.9em; color: var(--text-dim); margin: 0 0 8px; }
 
 /* ---------- arXiv link + citation line (tasks/p11-launch.md sec.2) ---------- */
 .topbar__arxiv {
@@ -673,27 +709,60 @@ body[data-resizing] .pane { pointer-events: none; }
   .pane--graph, .cy-canvas { overflow: hidden; }
 }
 
-/* ---------- Essentials / Everything (tasks/p17-essentials.md) ---------- */
+/* ---------- Main results / Full graph (tasks/p17-essentials.md, p18-legend.md);
+   internally still "essentials"/"everything" (data-graph-tiers, localStorage). The
+   legend follows the current view -- which box/arrow types it shows depends on
+   data-graph-tiers (essentials/everything) and data-graph-mode (map/cluster/focus),
+   both set by graphnav.mjs's syncControls. Before the graph script runs, the plain
+   "A -> B" row and the box types common to every view show; the rest wait for it. ---------- */
 .graph-tiers { display: inline-flex; }
 .graph-tiers .graph-btn:first-child { border-radius: 999px 0 0 999px; }
 .graph-tiers .graph-btn:last-child { border-radius: 0 999px 999px 0; margin-left: -1px; }
-/* The legend follows the view; before the graph script runs, the old one shows. */
-.graph-legend__row--essentials, .graph-legend__key--essentials { display: none !important; }
-.pane--graph[data-graph-tiers="essentials"] .graph-legend__row--essentials { display: flex !important; }
-.pane--graph[data-graph-tiers="essentials"] .graph-legend__key--essentials { display: inline-flex !important; }
-.pane--graph[data-graph-tiers="essentials"] .graph-legend__row--everything { display: none !important; }
-/* The thick skeleton arrow is drawn only on the whole map. */
-.pane--graph[data-graph-tiers="essentials"]:not([data-graph-mode="map"]) .graph-legend__key--essentials { display: none !important; }
+/* Theorem/Major result/Lean can appear even on the Main results whole map (it
+   draws only the majors and the skeleton), so that row has no condition -- it
+   always shows. */
+.graph-legend__row--skeleton-arrow,
+.graph-legend__row--sections,
+.graph-legend__row--context,
+.graph-legend__row--overlays { display: none; }
+/* The thick skeleton arrow is drawn only on the Main results whole map. */
+.pane--graph[data-graph-tiers="essentials"][data-graph-mode="map"] .graph-legend__row--skeleton-arrow { display: flex; }
+/* Definitions, external inputs, [AK25] items, Background nodes, a selection/focus
+   outline and fading never appear in Main results except inside a focus (a Main
+   results map or opened section never draws any of them) -- everywhere else
+   (a focus, Full graph) they can. */
+.pane--graph[data-graph-tiers="everything"] .graph-legend__row--context,
+.pane--graph[data-graph-mode="focus"] .graph-legend__row--context,
+.pane--graph[data-graph-tiers="everything"] .graph-legend__row--overlays,
+.pane--graph[data-graph-mode="focus"] .graph-legend__row--overlays { display: flex; }
+/* Closed section/subsection boxes are drawn only in Full graph, and not inside a
+   focus (a focus never shows a raw section or subsection). */
+.pane--graph[data-graph-tiers="everything"]:not([data-graph-mode="focus"]) .graph-legend__row--sections { display: flex; }
 .legend-swatch--major { background: var(--surface); border: 2px solid var(--accent); width: 12px; height: 12px; }
 .legend-swatch--definition { background: var(--surface-2); border: 1px solid var(--border); }
+.legend-outline {
+  display: inline-block; width: 12px; height: 12px; border-radius: 3px;
+  background: var(--surface); border: 2px solid var(--focus-ring);
+}
+/* A line sample: border-top (not background) so dashed/dotted modifiers work. */
 .legend-arrow {
-  display: inline-block; position: relative; width: 22px; height: 3px; background: var(--text);
-  border-radius: 2px; margin-right: 2px;
+  display: inline-block; position: relative; width: 22px; height: 0; margin-right: 6px;
+  border-top: 2.6px solid var(--text); vertical-align: middle;
 }
 .legend-arrow::after {
-  content: ""; position: absolute; right: -2px; top: -4px;
-  border-left: 7px solid var(--text); border-top: 5.5px solid transparent; border-bottom: 5.5px solid transparent;
+  content: ""; position: absolute; right: -1px; top: -4.5px;
+  border-left: 6px solid var(--text); border-top: 4.5px solid transparent; border-bottom: 4.5px solid transparent;
 }
+.legend-arrow--dashed, .legend-arrow--dotted, .legend-arrow--mutual { border-top-width: 1.4px; border-color: var(--text-faint); }
+.legend-arrow--dashed { border-top-style: dashed; }
+.legend-arrow--dotted { border-top-style: dotted; }
+.legend-arrow--dashed::after, .legend-arrow--dotted::after, .legend-arrow--mutual::after { border-left-color: var(--text-faint); }
+.legend-arrow--mutual::before {
+  content: ""; position: absolute; left: -1px; top: -4.5px;
+  border-right: 6px solid var(--text-faint); border-top: 4.5px solid transparent; border-bottom: 4.5px solid transparent;
+}
+.legend-arrow--bg { border-top-width: 1px; border-top-style: dashed; border-color: var(--border); }
+.legend-arrow--bg::after { border-left-color: var(--border); border-top-width: 3.5px; border-bottom-width: 3.5px; top: -3.5px; }
 /* A skeleton arrow's hover card: the hidden results it passes through. */
 .graph-tip {
   position: absolute; z-index: 5; max-width: 320px; pointer-events: none;

@@ -38,7 +38,14 @@ export const ZOOM = {
   min: 0.5, // below this the 12-13px labels stop being readable
   max: 2.5,
   fitMax: 1.3, // never blow a small view up past this when fitting
-  focusReadable: 0.75, // a focus view is never fitted smaller than this
+  // tasks/p18-legend.md: at the fitted zoom, a box's own font-size * zoom
+  // ("effective size") must stay >= ~11px -- these floors are picked against
+  // the actual font-sizes buildStylesheet uses (ess-major.lvl-L2: 14px,
+  // node.lvl-L0/L1: 15px, the default 12px), so the view overflows (pannable)
+  // rather than shrink text past that.
+  focusReadable: 0.95, // a focus that must be forced is forced to this
+  focusMinFit: 0.75, // below this (9px on the default 12px font) forcing kicks in
+  mapReadable: 0.75, // nor an overview (whole map or opened cluster)
 };
 
 // ---------------------------------------------------------------------------
@@ -355,7 +362,7 @@ export function essentialsMap(index) {
  * to keep the arrows between bands short. `sizeOf(id)` -> {w, h}. Returns Map id ->
  * {x, y} for the results (a band's box follows from its results).
  */
-export function essentialsLayout(graph, sizeOf, { colGap = 30, rowGap = 50, stackGap = 12 } = {}) {
+export function essentialsLayout(graph, sizeOf, { colGap = 20, rowGap = 46, stackGap = 12 } = {}) {
   const items = graph.nodes.filter((n) => !n.band);
   const order = new Map(graph.nodes.map((n, i) => [n.id, i]));
   // Longest path from a source along the (acyclic) skeleton.
@@ -567,13 +574,28 @@ export function focusGraph(index, focusId, { hops = 1, showAkhc = false } = {}) 
  * so arrows run left to right, ingredient -> focus -> consequence.
  * A column taller than `maxRows` wraps into side-by-side sub-columns, and
  * [AK25] items start a sub-column of their own. Sub-columns of one column
- * are offset by a fraction of the row pitch, so a horizontal edge into a
- * far sub-column passes between the nodes of a near one. Returns
+ * are offset by a small stagger, so a horizontal edge into a far sub-column
+ * passes between the nodes of a near one. `focusName` (the focused result's
+ * own number/title), when given, names it in the two innermost captions
+ * ("What Prop 2.1 uses", "What uses Prop 2.1") so the columns layout reads
+ * on its own, without the generic "Uses"/"Used by".
+ *
+ * `sizeOf(id)` -> {w, h}, the node's own real box size (site/graphnav.mjs
+ * measures it with cytoscape's `layoutDimensions` after the elements are
+ * added, the same way essentialsLayout does) -- spacing is computed from
+ * actual sizes, not a fixed row pitch, so a taller box (e.g. a 3-line
+ * theorem) never overlaps its neighbour above or below (a fixed-row-pitch
+ * version of this once let a tall box do exactly that). A header's `topY`
+ * is its column's own top edge, real sizes included; site/graphnav.mjs
+ * (layoutFocus) turns that into a final `y` once it also knows the header's
+ * own real height (its caption can wrap to more than one line), so a
+ * caption always clears its column's top box, however tall either is.
+ * Returns
  *   positions: Map id -> {x, y}
- *   headers:   [{id, label, x, y}]  (column captions)
+ *   headers:   [{id, label, x, topY}]  (column captions)
  */
 export function focusLayout(graph, {
-  nodeWidth = 184, focusWidth = 220, rowPitch = 54, subGap = 24, colGap = 62, maxRows = 13,
+  sizeOf = () => ({ w: 160, h: 40 }), focusName = null, rowGap = 12, subGap = 24, colGap = 62, staggerStep = 20, maxRows = 13,
 } = {}) {
   const positions = new Map();
   const headers = [];
@@ -592,7 +614,7 @@ export function focusLayout(graph, {
     const dir = side === 'uses' ? -1 : 1;
     const sideNodes = graph.nodes.filter((n) => n.side === side);
     const maxDist = sideNodes.reduce((m, n) => Math.max(m, n.dist), 0);
-    let edge = focusWidth / 2; // distance from x=0 to the near edge of the next column
+    let edge = sizeOf(focus.id).w / 2; // distance from x=0 to the near edge of the next column
     for (let d = 1; d <= maxDist; d++) {
       const col = sideNodes.filter((n) => n.dist === d).sort((a, b) => a.rank - b.rank);
       const paper = col.filter((n) => n.group !== 2).map((n) => n.id);
@@ -602,36 +624,49 @@ export function focusLayout(graph, {
       const subs = col.length <= maxRows
         ? [{ group: paper.length ? 0 : 2, ids: [...paper, ...ak] }]
         : [...chunk(paper).map((ids) => ({ group: 0, ids })), ...chunk(ak).map((ids) => ({ group: 2, ids }))];
-      // Sub-column j sits j/k of a row lower than a whole number of rows
-      // from sub-column 0, as near to centred as that allows.
-      const k = subs.length;
-      const base = -((subs[0].ids.length - 1) * rowPitch) / 2;
+      // Sub-column j is stacked by each item's own real height (never a fixed
+      // pitch), centred on the column, then nudged down by a small stagger so
+      // an edge into a far sub-column threads between a near one's boxes.
+      let cursor = edge + colGap;
       subs.forEach((sub, j) => {
-        const x = dir * (edge + colGap + nodeWidth / 2 + j * (nodeWidth + subGap));
-        const stagger = (j * rowPitch) / k;
-        const centred = -((sub.ids.length - 1) * rowPitch) / 2;
-        const top = base + stagger + Math.round((centred - base - stagger) / rowPitch) * rowPitch;
-        sub.ids.forEach((id, i) => positions.set(id, { x, y: top + i * rowPitch }));
+        const sizes = sub.ids.map((id) => sizeOf(id));
+        const subW = Math.max(...sizes.map((z) => z.w));
+        const x = dir * (cursor + subW / 2);
+        const totalH = sizes.reduce((sum, z) => sum + z.h, 0) + rowGap * (sizes.length - 1);
+        const stagger = j * staggerStep;
+        let y = -totalH / 2 + stagger;
+        sub.ids.forEach((id, i) => {
+          const h = sizes[i].h;
+          positions.set(id, { x, y: y + h / 2 });
+          y += h + rowGap;
+        });
         sub.x = x;
-        sub.top = top;
+        sub.top = -totalH / 2 + stagger; // the sub-column's own top edge
+        cursor += subW + subGap;
       });
       const topY = Math.min(...subs.map((s) => s.top));
-      const nearX = subs[0].x;
-      const farX = subs[subs.length - 1].x;
       const paperSubs = subs.filter((s) => s.group !== 2);
       const akSubs = subs.filter((s) => s.group === 2);
-      const caption = side === 'uses' ? (d === 1 ? 'Uses' : 'Uses, one step further') : (d === 1 ? 'Used by' : 'Used by, one step further');
+      // The first column names the focused result directly ("What Prop 2.1
+      // uses"/"What uses Prop 2.1"); a second step further stays generic.
+      const caption = side === 'uses'
+        ? (d === 1 ? (focusName ? `What ${focusName} uses ←` : 'Uses') : 'Uses, one step further')
+        : (d === 1 ? (focusName ? `→ What uses ${focusName}` : 'Used by') : 'Used by, one step further');
       if (paperSubs.length) {
         const x0 = paperSubs[0].x;
         const x1 = paperSubs[paperSubs.length - 1].x;
-        headers.push({ id: `hdr:${side}:${d}`, label: caption, x: (x0 + x1) / 2, y: topY - rowPitch * 0.8 });
+        headers.push({
+          id: `hdr:${side}:${d}`, label: caption, x: (x0 + x1) / 2, topY,
+        });
       }
       if (akSubs.length) {
         const x0 = akSubs[0].x;
         const x1 = akSubs[akSubs.length - 1].x;
-        headers.push({ id: `hdr:${side}:${d}:akhc`, label: paperSubs.length ? '[AK25]' : `${caption}: [AK25]`, x: (x0 + x1) / 2, y: topY - rowPitch * 0.8 });
+        headers.push({
+          id: `hdr:${side}:${d}:akhc`, label: paperSubs.length ? '[AK25]' : `${caption}: [AK25]`, x: (x0 + x1) / 2, topY,
+        });
       }
-      edge = Math.max(Math.abs(nearX), Math.abs(farX)) + nodeWidth / 2;
+      edge = cursor - subGap; // the far edge actually reached by this column
     }
   }
   return { positions, headers };
@@ -640,6 +675,19 @@ export function focusLayout(graph, {
 // ---------------------------------------------------------------------------
 // Viewport and zoom maths
 // ---------------------------------------------------------------------------
+
+/** Pan (one axis) that centres `want` (model units, at `zoom`) within
+ * [nearPad, size - farPad] when the box (lo0..hi0) fits there; otherwise
+ * anchors its near edge (lo0) to nearPad, so that edge never crosses out of
+ * view even though the far edge then overflows (tasks/p18-legend.md: used
+ * where a specific edge -- a whole map's band labels, a focus's left-column
+ * caption -- must never be the one that goes offscreen). */
+function clampOrAnchorNear(mid, size, nearPad, farPad, lo0, hi0, want, zoom) {
+  const least = nearPad - lo0 * zoom;
+  const most = size - farPad - hi0 * zoom;
+  if (least <= most) return Math.min(most, Math.max(least, mid - want * zoom));
+  return least;
+}
 
 /** `padding` as a number or {top, right, bottom, left}. */
 function insetsOf(padding) {
@@ -781,6 +829,15 @@ function writeViewPreference(v) {
   try { localStorage.setItem(VIEW_STORAGE_KEY, v); } catch { /* not remembered */ }
 }
 
+/** Whether the reader collapsed the graph legend, remembered the same way. */
+const LEGEND_STORAGE_KEY = 'hcp-legend-collapsed';
+function readLegendCollapsed() {
+  try { return localStorage.getItem(LEGEND_STORAGE_KEY) === '1'; } catch { return false; }
+}
+function writeLegendCollapsed(v) {
+  try { localStorage.setItem(LEGEND_STORAGE_KEY, v ? '1' : '0'); } catch { /* not remembered */ }
+}
+
 function truncate(s, max) {
   const t = String(s || '').trim();
   if (t.length <= max) return t;
@@ -846,13 +903,18 @@ function buildStylesheet(cssVar, fontGen = 0) {
     { selector: 'node.lvl-L0, node.lvl-L1', style: { 'font-size': 15 } },
     { selector: 'node.lvl-L0', style: { 'font-weight': 600 } },
     { selector: 'node.theorem', style: { 'background-color': cssVar('--accent'), color: cssVar('--surface'), 'border-color': cssVar('--accent-strong') } },
+    // Box geometry (width/text-max-width) is keyed on tier/kind alone below, never on
+    // which view drew the element, so a box is the same size everywhere it appears:
+    // the whole map, an opened section, a focus, Full graph. ":childless" guards a
+    // kind that can also be an opened (":parent") cluster -- section, subsection, the
+    // [AK25] container -- whose own size must stay free to fit its children.
     { selector: 'node.kind-section', style: { 'background-color': cssVar('--surface-2'), 'border-color': cssVar('--text-faint') } },
+    { selector: 'node.kind-section:childless', style: { width: 188, 'text-max-width': '172px' } },
     { selector: 'node.kind-subsection', style: { 'background-color': cssVar('--surface'), 'border-style': 'dashed', 'border-color': cssVar('--text-faint') } },
-    { selector: 'node.lvl-L2', style: { 'background-color': cssVar('--accent-2-tint'), 'border-color': cssVar('--accent-2') } },
-    { selector: 'node.lvl-ext', style: { 'border-style': 'dotted', 'font-style': 'italic' } },
-    { selector: 'node.cluster-akhc', style: { 'background-color': cssVar('--akhc-tint'), 'border-color': cssVar('--akhc'), 'border-style': 'dotted' } },
-    { selector: 'node.kind-akhc', style: { 'background-color': cssVar('--akhc-tint'), 'border-color': cssVar('--akhc'), 'border-style': 'dotted', 'font-style': 'normal' } },
-    { selector: 'node.kind-background', style: { 'background-color': cssVar('--background-node-tint'), 'border-color': cssVar('--background-node'), 'border-style': 'dashed', 'font-style': 'normal' } },
+    { selector: 'node.kind-subsection:childless', style: { width: 172, 'text-max-width': '158px' } },
+    { selector: 'node.lvl-L2', style: {
+      'background-color': cssVar('--accent-2-tint'), 'border-color': cssVar('--accent-2'), width: 156, 'text-max-width': '142px',
+    } },
     { selector: 'node.collapsed', style: { 'border-width': 2.5 } },
     // Lean-formalized: a green check-circle on the box's top-right corner.
     { selector: 'node.lean', style: {
@@ -868,35 +930,48 @@ function buildStylesheet(cssVar, fontGen = 0) {
       'text-valign': 'top', 'text-halign': 'center', 'text-margin-y': -4, 'text-events': 'yes',
       'background-opacity': 0.4, padding: '18px', 'font-size': 14, 'font-weight': 600,
     } },
+    // A halo (the pane's own background) and a z-index above the skeleton
+    // arrows, so a band label stays legible even where an arrow runs behind
+    // it (tasks/p18-legend.md: labels sit outside the bands, in the arrows'
+    // own area, and a long arrow can cross that margin).
     { selector: 'node.band-label', style: {
-      shape: 'rectangle', 'background-opacity': 0, 'border-width': 0, width: 'label', height: 'label', padding: '2px',
-      'font-size': 13, 'font-weight': 600, color: cssVar('--text-dim'), 'text-max-width': '120px', 'text-justify': 'right',
+      shape: 'rectangle', 'background-opacity': 1, 'background-color': cssVar('--bg'), 'border-width': 0,
+      width: 'label', height: 'label', padding: '3px', 'font-size': 13, 'font-weight': 600,
+      color: cssVar('--text-dim'), 'text-max-width': '120px', 'text-justify': 'right', 'z-index': 10,
     } },
     { selector: 'node.band', style: {
       'background-color': cssVar('--surface'), 'background-opacity': 0.5, 'border-width': 1, 'border-style': 'solid',
       'border-color': cssVar('--border'), color: cssVar('--text-dim'), 'font-size': 13, 'font-weight': 600, padding: '14px',
       'text-max-width': '600px', 'text-wrap': 'none',
     } },
-    { selector: 'node.fnode', style: {
-      width: 184, height: 40, 'text-max-width': '174px', padding: '4px', 'font-size': 12,
-    } },
-    { selector: 'node.fnode.lvl-L0', style: { 'font-weight': 600 } },
-    // Essentials (tasks/p17-essentials.md): the ess-* classes are set only in that view,
-    // so "Everything" draws exactly as before. Major results stand out (bold, a strong
-    // border in the theorem colour); definitions are small grey boxes.
-    { selector: 'node.ess-major', style: { 'border-width': 3, 'border-color': cssVar('--accent'), 'font-weight': 700 } },
-    { selector: 'node.ess-major.lvl-L2', style: { 'background-color': cssVar('--surface'), color: cssVar('--text') } },
+    // Tiers (tasks/p17-essentials.md): major results stand out (bold, a thicker
+    // border in the theorem colour, a wider box); definitions, external inputs and
+    // the [AK25] layer are small grey boxes. Applied everywhere (not just Main
+    // results), so a result's box looks the same wherever it is drawn.
+    { selector: 'node.ess-major', style: { 'border-width': 3, 'border-color': cssVar('--accent'), 'font-weight': 700, width: 176, 'text-max-width': '162px' } },
+    // A major result's own font-size, even an L2 one (base font-size is 12,
+    // node.lvl-L0/L1's 15 already covers a theorem) -- tasks/p18-legend.md:
+    // at the whole map's fitted zoom this must still read at >= 11px.
+    { selector: 'node.ess-major.lvl-L2', style: { 'background-color': cssVar('--surface'), color: cssVar('--text'), 'font-size': 15 } },
     { selector: 'node.ess-major.theorem', style: { 'border-color': cssVar('--accent-strong') } },
-    { selector: 'node.ess-map', style: {
-      width: 158, height: 'label', 'font-size': 14, 'text-max-width': '150px', padding: '8px',
-    } },
     { selector: 'node.ess-background', style: {
       'background-color': cssVar('--surface-2'), 'border-color': cssVar('--border'), 'border-width': 1,
-      color: cssVar('--text-dim'), 'font-size': 10.5, 'font-weight': 400,
+      color: cssVar('--text-dim'), 'font-size': 11, 'font-weight': 400,
     } },
-    { selector: 'node.fnode.ess-background', style: { width: 150, height: 30, 'text-max-width': '142px', padding: '2px' } },
+    { selector: 'node.ess-background:childless', style: { width: 138, 'text-max-width': '122px', padding: '5px' } },
+    // The [AK25] layer's own colours (external input italic-dotted; a quoted [AK25]
+    // item or a Background node, tinted) come after ess-background, so a citation or
+    // a Background node keeps its own colour even where it is also sized/dimmed as
+    // background context (e.g. flanking a focus) -- only a plain definition, with no
+    // colour of its own, actually shows ess-background's grey.
+    { selector: 'node.lvl-ext', style: { 'border-style': 'dotted', 'font-style': 'italic' } },
+    { selector: 'node.cluster-akhc', style: { 'background-color': cssVar('--akhc-tint'), 'border-color': cssVar('--akhc'), 'border-style': 'dotted' } },
+    { selector: 'node.kind-akhc', style: { 'background-color': cssVar('--akhc-tint'), 'border-color': cssVar('--akhc'), 'border-style': 'dotted', 'font-style': 'normal' } },
+    { selector: 'node.kind-background', style: { 'background-color': cssVar('--background-node-tint'), 'border-color': cssVar('--background-node'), 'border-style': 'dashed', 'font-style': 'normal' } },
+    // The focused box in a column layout: an outline overlay only (like
+    // .is-selected below) -- its fill/border/width/font stay whatever its own
+    // tier/kind gives it, so it is recognisable as the same box the map showed.
     { selector: 'node.focus', style: {
-      width: 220, height: 'label', 'text-max-width': '204px', padding: '10px', 'font-size': 14, 'font-weight': 600,
       'border-width': 3, 'border-color': cssVar('--focus-ring'),
       'underlay-color': cssVar('--focus-ring'), 'underlay-opacity': 0.16, 'underlay-padding': 7, 'underlay-shape': 'round-rectangle',
     } },
@@ -930,8 +1005,20 @@ function buildStylesheet(cssVar, fontGen = 0) {
     { selector: 'edge.f-in', style: { 'curve-style': 'taxi', 'taxi-direction': 'rightward', 'taxi-turn': '-30px', 'taxi-radius': 10, 'taxi-turn-min-distance': 6 } },
     { selector: 'edge.layout-helper', style: { visibility: 'hidden', events: 'no' } },
     { selector: 'edge.ess-edge', style: { width: 1.8, opacity: 0.8, 'line-color': cssVar('--text-dim'), 'target-arrow-color': cssVar('--text-dim'), 'source-arrow-color': cssVar('--text-dim') } },
+    // Dark grey, not near-black (tasks/p18-legend.md), and thinner (~2px) now
+    // that all 28 direct uses are drawn -- still clearly heavier than a
+    // supporting arrow (edge.ess-edge, 1.8) or the plain default (edge, 1.4).
+    // Hovering a box's own arrows highlights them (edge.hl, below) instead.
+    // Straight by default; only .skeleton.bowed (layoutOverview, set when a
+    // straight line would run through a third major's box -- e.g. Prop 2.1 ->
+    // Theorem A, roughly in line with Prop 5.2 -> Theorem A) actually bows,
+    // so it stays visible as its own arrow instead of running invisibly
+    // behind that shorter chain.
     { selector: 'edge.skeleton', style: {
-      width: 3.2, 'line-color': cssVar('--text'), 'target-arrow-color': cssVar('--text'), 'arrow-scale': 1.1, opacity: 0.8,
+      width: 2, 'line-color': cssVar('--text-dim'), 'target-arrow-color': cssVar('--text-dim'), 'arrow-scale': 1, opacity: 0.85,
+    } },
+    { selector: 'edge.skeleton.bowed', style: {
+      'curve-style': 'unbundled-bezier', 'control-point-distances': [100], 'control-point-weights': [0.5],
     } },
     { selector: 'edge.bg-edge', style: {
       width: 0.9, 'line-style': 'dashed', 'line-dash-pattern': [4, 3], 'line-color': cssVar('--border'),
@@ -962,10 +1049,13 @@ function buildStylesheet(cssVar, fontGen = 0) {
  * Views: the whole map (L0, everything closed); an opened cluster
  * (clusterView: its contents, with sub-clusters opened in place, and its
  * direct outside links as context); a result's focus (focusGraph).
- * In "Essentials" (the default, tasks/p17-essentials.md) the whole map is the major
- * results in section bands joined by the proof skeleton, an opened section leaves
- * out its definitions, and a focus styles its nodes by tier; "Everything" draws
- * every view exactly as before. The choice is remembered (localStorage).
+ * In "Main results" (the default, tasks/p17-essentials.md; internally still called
+ * "essentials") the whole map is the major results in section bands joined by the
+ * proof skeleton, and an opened section leaves out its definitions; "Full graph"
+ * (internally "everything") draws every result, definition and link. A node's own
+ * box style (fill, border, width, font) is the same in both, and in a focus, an
+ * opened cluster or a band on the map: only the tier/kind classes below decide it,
+ * never which view drew the element. The choice is remembered (localStorage).
  * Returns {show(id|null), wholeMap(selectedId?), setHops(n), setShowAkhc(bool),
  * setEssentials(bool), isEssentials(),
  * zoomBy(f), fit(), zoomToSelection(), resize(), refreshStyle(), cy}.
@@ -1003,7 +1093,8 @@ export function createGraphController(opts) {
     snapshots: new Map(), // cluster id -> overview state to return to when it closes
     pendingFit: false, // a fit was asked for while the canvas had no size (phone width)
     userMoved: false, // the reader zoomed or panned since the last fit
-    essentials: readViewPreference() !== 'everything', // "Essentials" (the default) or "Everything"
+    essentials: readViewPreference() !== 'everything', // "Main results" (the default) or "Full graph"
+    legendCollapsed: readLegendCollapsed(),
   };
 
   /** The index the current overview is drawn from: in Essentials, an opened
@@ -1019,12 +1110,24 @@ export function createGraphController(opts) {
     if (st.essentials) for (const c of clustersInside(indexFor(id), id)) open.add(c);
     return open;
   }
-  /** Tier classes, in Essentials only (Everything draws exactly as before). */
+  /** Tier classes: major/supporting/background, plus the [AK25] layer and external
+   * inputs styled as background. Applied in every view (Main results and Full
+   * graph alike), so a result's box looks the same wherever it is drawn. */
   function tierClasses(id) {
-    if (!st.essentials) return [];
     const n = index.nodes.get(id);
     if (n && n.tier) return [`ess-${n.tier}`];
     return n && (n.akhc || n.kind === 'external') ? ['ess-background'] : [];
+  }
+
+  /** How much of a node's title `nodeLabel` shows before truncating, by tier/kind --
+   * the same number wherever the node is drawn (the whole map, an opened section, a
+   * focus, Full graph), so a box wraps/truncates identically everywhere. */
+  function titleMaxFor(id) {
+    const n = index.nodes.get(id);
+    if (!n) return 30;
+    if (n.tier === 'major') return 40;
+    if (n.tier === 'background' || n.akhc || n.kind === 'external') return 26;
+    return 30;
   }
 
   const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia
@@ -1068,10 +1171,10 @@ export function createGraphController(opts) {
         });
         continue;
       }
-      const classes = [...nodeClasses(raw(n.id)), ...tierClasses(n.id), 'ess-map'];
+      const classes = [...nodeClasses(raw(n.id)), ...tierClasses(n.id)];
       els.push({
         group: 'nodes',
-        data: { id: n.id, parent: n.parent || undefined, label: nodeLabel(t, { maxTitle: 40 }) },
+        data: { id: n.id, parent: n.parent || undefined, label: nodeLabel(t, { maxTitle: titleMaxFor(n.id) }) },
         classes: classes.join(' '),
       });
     }
@@ -1104,6 +1207,7 @@ export function createGraphController(opts) {
       const label = n.expanded
         ? [t.number, t.title].filter(Boolean).join('  ')
         : nodeLabel(t, {
+          maxTitle: titleMaxFor(n.id),
           childCount: (idx.children.get(n.id) || []).length,
           collapsedCluster: n.cluster,
           akhcCluster: index.nodes.get(n.id).kind === 'external',
@@ -1128,25 +1232,24 @@ export function createGraphController(opts) {
     return els;
   }
 
+  /** Nodes and edges only -- no headers (column captions): those need each
+   * box's real rendered size, so layoutFocus (below) adds them itself once
+   * everything here is already in cy and styled. */
   function focusElements() {
     const g = focusGraph(index, st.focusId, { hops: st.hops, showAkhc: st.showAkhc });
-    const { positions, headers } = focusLayout(g);
     const els = [];
     const background = (id) => tierClasses(id).includes('ess-background');
     for (const n of g.nodes) {
-      const classes = [...nodeClasses(raw(n.id)), ...tierClasses(n.id)];
-      classes.push('fnode', `side-${n.side}`);
+      // Same tier/kind classes, same titleMaxFor as every other view -- a box
+      // looks the same here as on the map or in an opened section; only its
+      // position differs (set afterwards, by layoutFocus, from each box's real
+      // size), and the focused box also gets the 'focus' outline.
+      const classes = [...nodeClasses(raw(n.id)), ...tierClasses(n.id), `side-${n.side}`];
       if (n.side === 'focus') classes.push('focus');
-      const label = nodeLabel(textOf(n.id), { maxTitle: n.side === 'focus' ? 90 : 25 });
+      const label = nodeLabel(textOf(n.id), { maxTitle: titleMaxFor(n.id) });
       els.push({
-        group: 'nodes',
-        data: { id: n.id, label },
-        classes: classes.join(' '),
-        position: { ...positions.get(n.id) },
+        group: 'nodes', data: { id: n.id, label }, classes: classes.join(' '), position: { x: 0, y: 0 },
       });
-    }
-    for (const h of headers) {
-      els.push({ group: 'nodes', data: { id: h.id, label: h.label }, classes: 'header', position: { x: h.x, y: h.y } });
     }
     g.edges.forEach((e) => {
       const cls = [e.kind];
@@ -1155,6 +1258,43 @@ export function createGraphController(opts) {
       els.push({ group: 'edges', data: { id: `f:${e.source}>${e.target}`, source: e.source, target: e.target }, classes: cls.join(' ') });
     });
     return els;
+  }
+
+  /** Positions a rendered focus view from each box's own real size
+   * (cytoscape's layoutDimensions, measured now that every box is added and
+   * styled), then adds the column-caption headers at their computed spots --
+   * tasks/p18-legend.md: a fixed row pitch once let a taller box (e.g. a
+   * 3-line theorem) overlap its neighbour or a column's caption. */
+  function layoutFocus() {
+    const g = focusGraph(index, st.focusId, { hops: st.hops, showAkhc: st.showAkhc });
+    const focusName = (() => {
+      const t = textOf(st.focusId);
+      const name = t.number || t.title;
+      return name ? truncate(name, 24) : null;
+    })();
+    const sizeOf = (id) => {
+      const d = cy.getElementById(id).layoutDimensions({ nodeDimensionsIncludeLabels: true });
+      return { w: d.w, h: d.h };
+    };
+    const { positions, headers } = focusLayout(g, { sizeOf, focusName });
+    for (const [id, pos] of positions) {
+      const n = cy.getElementById(id);
+      if (!n.empty()) n.position(pos);
+    }
+    // A header (column caption) is added at a placeholder y, then measured for
+    // its own real height and moved to clear its column's top box by a small
+    // fixed margin -- a caption can wrap to more than one line, so a fixed gap
+    // sized for one line once let it overlap the box below it.
+    const HEADER_MARGIN = 8;
+    cy.add(headers.map((h) => ({
+      group: 'nodes', data: { id: h.id, label: h.label }, classes: 'header', position: { x: h.x, y: h.topY },
+    })));
+    for (const h of headers) {
+      const n = cy.getElementById(h.id);
+      if (n.empty()) continue;
+      const hh = n.layoutDimensions({ nodeDimensionsIncludeLabels: true }).h;
+      n.position({ x: h.x, y: h.topY - HEADER_MARGIN - hh / 2 });
+    }
   }
 
   function render() {
@@ -1166,6 +1306,7 @@ export function createGraphController(opts) {
       cy.add(st.mode === 'focus' ? focusElements() : overviewElements());
     });
     if (st.mode === 'overview') layoutOverview();
+    else if (st.mode === 'focus') layoutFocus();
     markSelection();
     emphasize();
     syncControls();
@@ -1195,6 +1336,25 @@ export function createGraphController(opts) {
         return { w: d.w, h: d.h };
       });
       leaves.forEach((n) => { if (pos.has(n.id())) n.position(pos.get(n.id())); });
+      // Bow only a skeleton arrow that would otherwise run straight through a
+      // third major's own box (tasks/p18-legend.md): both ends in the same
+      // row (aligned y), with some other major sitting strictly between them.
+      const EPS_Y = 6;
+      const EPS_X = 4;
+      cy.edges('.skeleton').forEach((e) => {
+        const s = pos.get(e.source().id());
+        const t = pos.get(e.target().id());
+        let blocked = false;
+        if (s && t && Math.abs(s.y - t.y) < EPS_Y) {
+          const lo = Math.min(s.x, t.x);
+          const hi = Math.max(s.x, t.x);
+          for (const [id, p] of pos) {
+            if (id === e.source().id() || id === e.target().id()) continue;
+            if (Math.abs(p.y - s.y) < EPS_Y && p.x > lo + EPS_X && p.x < hi - EPS_X) { blocked = true; break; }
+          }
+        }
+        e.toggleClass('bowed', blocked);
+      });
       cy.nodes('.band').forEach((b) => {
         const label = cy.getElementById(`band-label:${b.id()}`);
         if (label.empty()) return;
@@ -1276,6 +1436,10 @@ export function createGraphController(opts) {
     const lg = box('.graph-legend');
     if (tb) pad.top = Math.max(pad.top, tb.bottom - r.top + 12);
     if (zm) pad.right = Math.max(pad.right, r.right - zm.left + 12);
+    // The legend sits bottom-right (tasks/p18-legend.md), away from the
+    // essentials whole map's band labels (left margin, outside the bands) --
+    // only its height is reserved, as before; reserving its width too once
+    // left the whole map with too little room to fit at a readable zoom.
     if (lg) pad.bottom = Math.max(pad.bottom, r.bottom - lg.top + 12);
     return pad;
   }
@@ -1302,17 +1466,70 @@ export function createGraphController(opts) {
     if (st.mode === 'focus') {
       const f = cy.getElementById(st.focusId);
       if (f.empty()) return;
-      setViewport(viewportFor(bbOf(cy.elements()), w, h, {
-        padding: insets(), prefer: f.position(), readable: ZOOM.focusReadable, maxZoom: ZOOM.fitMax,
-      }), animate);
+      // tasks/p18-legend.md: a focus's column captions sit above its topmost
+      // box, and the focused box is always at local (0, 0). If everything
+      // (both columns, both captions) already fits at a still-readable zoom
+      // (>= focusMinFit, ~9px on the default font), show it all, centred as
+      // usual. Otherwise, forcing zoom up to keep text readable would, under
+      // plain centring, push the captions up above the pane (under the
+      // toolbar, or off it) or to the side, so instead fit just the two
+      // captions and the focus box itself (a much smaller box than the whole
+      // view, so it fits) top-aligned -- captions visible just below the
+      // toolbar, the focus centred horizontally under them -- and let the
+      // (still fully drawn) boxes of both columns overflow left/right/down,
+      // pannable, rather than ever cropping a caption.
+      const bb = bbOf(cy.elements());
+      const pad = insets();
+      const availW = Math.max(1, w - pad.left - pad.right);
+      const availH = Math.max(1, h - pad.top - pad.bottom);
+      const bw = Math.max(1, bb.x2 - bb.x1);
+      const bh = Math.max(1, bb.y2 - bb.y1);
+      const natural = Math.min(ZOOM.fitMax, Math.max(ZOOM.min, Math.min(availW / bw, availH / bh)));
+      if (natural >= ZOOM.focusMinFit) {
+        setViewport(viewportFor(bb, w, h, { padding: pad, prefer: f.position(), maxZoom: ZOOM.fitMax }), animate);
+      } else {
+        const zoom = Math.min(ZOOM.fitMax, Math.max(ZOOM.min, ZOOM.focusReadable));
+        const midX = pad.left + availW / 2;
+        const must = bbOf(cy.nodes('.header, .focus'));
+        const panX = clampOrAnchorNear(midX, w, pad.left, pad.right, must.x1, must.x2, 0, zoom);
+        setViewport({ zoom, pan: { x: panX, y: pad.top - must.y1 * zoom } }, animate);
+      }
       return;
     }
     const all = cy.elements().not('.layout-helper');
     if (all.empty()) return;
     const pad = insets();
+    // The essentials whole map (tasks/p18-legend.md): its band labels sit in
+    // the left margin, outside the bands, so at a forced (too-small-to-fit)
+    // zoom a plain centred pan can push them past the left edge -- centring
+    // on the bbox happens to touch it exactly at some widths, and the pane's
+    // own fractional-pixel size at others pushes it a hair past 0. Anchor the
+    // left edge (bb.x1, labels included -- bbOf includes labels) to the left
+    // padding instead, whenever the natural fit needs forcing; only the
+    // right side then overflows (pannable).
+    if (!st.subject && st.essentials) {
+      const bb = bbOf(all);
+      const availW = Math.max(1, w - pad.left - pad.right);
+      const availH = Math.max(1, h - pad.top - pad.bottom);
+      const bw = Math.max(1, bb.x2 - bb.x1);
+      const bh = Math.max(1, bb.y2 - bb.y1);
+      const natural = Math.min(ZOOM.fitMax, Math.max(ZOOM.min, Math.min(availW / bw, availH / bh)));
+      if (natural >= ZOOM.mapReadable) {
+        setViewport(viewportFor(bb, w, h, { padding: pad, maxZoom: ZOOM.fitMax }), animate);
+      } else {
+        const zoom = Math.min(ZOOM.fitMax, Math.max(ZOOM.min, ZOOM.mapReadable));
+        const midX = pad.left + availW / 2;
+        const midY = pad.top + availH / 2;
+        const centreX = (bb.x1 + bb.x2) / 2;
+        const centreY = (bb.y1 + bb.y2) / 2;
+        const panX = clampOrAnchorNear(midX, w, pad.left, pad.right, bb.x1, bb.x2, centreX, zoom);
+        setViewport({ zoom, pan: { x: panX, y: midY - centreY * zoom } }, animate);
+      }
+      return;
+    }
     const target = st.zoomTarget ? cy.getElementById(st.zoomTarget) : cy.collection();
     let vp = viewportFor(bbOf(all), w, h, { padding: pad, maxZoom: ZOOM.fitMax });
-    if (target.nonempty() && (target.id() !== st.subject || vp.zoom < ZOOM.focusReadable)) {
+    if (target.nonempty() && (target.id() !== st.subject || vp.zoom < ZOOM.mapReadable)) {
       // An opened cluster: its own contents fill the view (context around it
       // may be cut off -- it is one pan away).
       vp = viewportFor(bbOf(target.union(target.descendants())), w, h, { padding: pad, maxZoom: ZOOM.fitMax });
@@ -1466,8 +1683,11 @@ export function createGraphController(opts) {
   const hintEl = q('[data-graph-hint]');
   const akhcToggle = q('[data-graph-akhc]');
   const tiersGroup = q('[data-graph-view-switch]');
+  const legendToggle = q('[data-graph-action="legend-toggle"]');
 
   function syncControls() {
+    if (pane) pane.dataset.legendCollapsed = String(st.legendCollapsed);
+    if (legendToggle) legendToggle.setAttribute('aria-expanded', String(!st.legendCollapsed));
     if (tiersGroup) {
       tiersGroup.querySelectorAll('[data-graph-action^="view-"]').forEach((b) => {
         b.setAttribute('aria-pressed', String(b.dataset.graphAction === (st.essentials ? 'view-essentials' : 'view-everything')));
@@ -1482,7 +1702,7 @@ export function createGraphController(opts) {
     }
     if (akhcToggle) akhcToggle.checked = st.showAkhc;
     if (hintEl) {
-      if (st.mode === 'focus') hintEl.textContent = 'Left: what it uses. Right: what uses it. Click any box to go there.';
+      if (st.mode === 'focus') hintEl.textContent = 'Columns, not the map: what it uses in the left columns, what uses it in the right ones. Click any box to go there.';
       else if (st.essentials && !st.subject) hintEl.textContent = 'The main results and how each is used to prove the next. Click a section to see its supporting results.';
       else if (st.essentials) hintEl.textContent = 'Definitions are hidden here. Click a result to see everything it uses, or a heading to close it.';
       else if (st.subject) hintEl.textContent = 'Click a part to open it, or its heading to close it. Faded boxes outside link in or out.';
@@ -1540,6 +1760,13 @@ export function createGraphController(opts) {
     fitView(true);
   }
 
+  /** The "Legend" toggle: collapses the legend to keep it from covering the graph. */
+  function setLegendCollapsed(on) {
+    st.legendCollapsed = !!on;
+    writeLegendCollapsed(st.legendCollapsed);
+    syncControls();
+  }
+
   if (pane) {
     pane.addEventListener('click', (e) => {
       const b = e.target.closest('[data-graph-action]');
@@ -1554,6 +1781,7 @@ export function createGraphController(opts) {
       else if (a === 'hops-2') setHops(2);
       else if (a === 'view-essentials') setEssentials(true);
       else if (a === 'view-everything') setEssentials(false);
+      else if (a === 'legend-toggle') setLegendCollapsed(!st.legendCollapsed);
     });
     if (akhcToggle) akhcToggle.addEventListener('change', () => setShowAkhc(akhcToggle.checked));
     // Keyboard zoom while the graph (or one of its controls) has focus.
@@ -1684,7 +1912,23 @@ export function createGraphController(opts) {
     });
   }
 
+  syncControls();
+
   return {
-    show, wholeMap, setHops, setShowAkhc, setEssentials, isEssentials: () => st.essentials, zoomBy, fit: () => fitView(true), zoomToSelection, resize, refreshStyle, cy, index,
+    show,
+    wholeMap,
+    setHops,
+    setShowAkhc,
+    setEssentials,
+    isEssentials: () => st.essentials,
+    setLegendCollapsed,
+    isLegendCollapsed: () => st.legendCollapsed,
+    zoomBy,
+    fit: () => fitView(true),
+    zoomToSelection,
+    resize,
+    refreshStyle,
+    cy,
+    index,
   };
 }

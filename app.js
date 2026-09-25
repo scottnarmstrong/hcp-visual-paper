@@ -178,6 +178,41 @@ function welcomeFooterHtml(meta) {
       </footer>`;
 }
 
+/** "How to read the graph" (tasks/p18-legend.md): every box and arrow style the
+ * graph draws, a mini swatch reusing the graph legend's own CSS classes (so this
+ * and the legend can never drift apart), plus one plain sentence each on Main
+ * results vs. Full graph, the two layouts (map and columns), opening a section,
+ * clicking a result, and Back/Forward. Fixed, reviewed copy -- see the header
+ * comment above welcomePanelHtml. */
+function howToReadGraphHtml() {
+  return `
+    <div class="welcome-panel__how-to-read" id="how-to-read-graph">
+      <h3 class="section-label">How to read the graph</h3>
+      <ul class="how-to-read__list">
+        <li><i class="legend-swatch legend-swatch--theorem" aria-hidden="true"></i>Theorem: filled.</li>
+        <li><i class="legend-swatch legend-swatch--major" aria-hidden="true"></i>Major result: thick border.</li>
+        <li><i class="legend-swatch legend-swatch--result" aria-hidden="true"></i>Supporting result: pale tint.</li>
+        <li><i class="legend-swatch legend-swatch--definition" aria-hidden="true"></i>Definition: small, grey.</li>
+        <li><i class="legend-swatch legend-swatch--section" aria-hidden="true"></i>Section: grey box.</li>
+        <li><i class="legend-swatch legend-swatch--subsection" aria-hidden="true"></i>Subsection: white, dashed border.</li>
+        <li><i class="legend-swatch legend-swatch--ext" aria-hidden="true"></i>External input: dotted border, italic.</li>
+        <li><i class="legend-swatch legend-swatch--akhc" aria-hidden="true"></i>[AK25] item: quoted from the earlier paper.</li>
+        <li><i class="legend-swatch legend-swatch--background" aria-hidden="true"></i>Background node: a fact the paper takes from [AK25] without stating it.</li>
+        <li><i class="legend-swatch legend-swatch--lean" aria-hidden="true"></i>Lean check: covered by the formalization.</li>
+        <li><i class="legend-arrow" aria-hidden="true"></i>Thick arrow: a major result used directly to prove another.</li>
+        <li><i class="legend-arrow legend-arrow--dashed" aria-hidden="true"></i>Dashed arrow: uses a definition.</li>
+        <li><i class="legend-arrow legend-arrow--dotted" aria-hidden="true"></i>Dotted arrow: cites [AK25].</li>
+        <li><i class="legend-arrow legend-arrow--mutual" aria-hidden="true"></i>Two-headed arrow: each result uses the other.</li>
+        <li><i class="legend-outline" aria-hidden="true"></i>Outline: the selected or focused result.</li>
+      </ul>
+      <p>Main results (the default) shows only the major results and the direct uses between them; Full graph shows every result, definition and link.</p>
+      <p>The map shows sections and results as boxes joined by arrows; clicking a result switches to a columns view instead, with what it uses in the left columns and what uses it in the right ones.</p>
+      <p>Click a section to open it and see what is inside; click it again to close it.</p>
+      <p>Click a result to read it in this panel: its statement, what it uses, what uses it, and, where the paper gives one, its proof.</p>
+      <p>Back and Forward step through the graph views already opened, like a browser's own.</p>
+    </div>`;
+}
+
 function welcomePanelHtml(data) {
   const meta = (data && data.meta) || {};
   const paperTitle = meta.paperTitle || DEFAULT_PAPER_TITLE;
@@ -203,6 +238,7 @@ function welcomePanelHtml(data) {
         <p>Each result has a short summary, the exact statement from the paper, what it uses and what uses it, and, where the paper gives one, its proof: a proof idea, then numbered steps, each with a one-line summary and the paper's own text. Click a highlighted symbol in any formula to see its definition.</p>
         <p>Everything shown is the paper's own text, text quoted from the earlier paper [AK25] that it cites, or a summary. The only mathematics that appears in neither paper is in nodes marked <em>Background</em>, which state facts the paper takes from [AK25]. Each summary or background sentence was checked, against the passages it cites, by an independent AI auditor that did not write it. A green ✓ on a box in the graph, and a <strong>Lean ✓</strong> badge above its statement, mark a result or definition covered by the Lean formalization; the badge links to it.</p>
       </div>
+      ${howToReadGraphHtml()}
       ${citeLine}
       <div class="welcome-panel__actions">${theoremAButton}${section6Button}</div>
       ${welcomeFooterHtml(meta)}
@@ -226,6 +262,20 @@ function initBrandHome() {
     else applyRoute(null);
     showPanelTab();
   });
+}
+
+/** The graph toolbar's "?" button (tasks/p18-legend.md): opens the welcome panel
+ * (like the site title) and scrolls straight to "How to read the graph" -- called
+ * synchronously (not left to the async hashchange event) so the scroll target
+ * exists by the time it runs. */
+function initGraphHelp() {
+  document.querySelectorAll('[data-graph-action="help"]').forEach((b) => b.addEventListener('click', () => {
+    if (location.hash && location.hash !== '#') location.hash = '';
+    applyRoute(null);
+    showPanelTab();
+    const target = document.getElementById('how-to-read-graph');
+    if (target) target.scrollIntoView({ block: 'start' });
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -958,6 +1008,7 @@ async function main() {
   initTabs();
   initReading();
   initBrandHome();
+  initGraphHelp();
   initHistoryNav();
   if (state.devMode) document.getElementById('dev-indicator').hidden = false;
 
