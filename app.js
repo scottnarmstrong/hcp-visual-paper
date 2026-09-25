@@ -259,6 +259,7 @@ function initGraph(data) {
       labelOf: graphLabelOf,
       cssVar,
       navigate: (id) => { navigate(id, 'L3'); showPanelTab(); },
+      onWholeMap: navigateWholeMap,
     });
   } catch (err) {
     graphFailed(err);
@@ -283,7 +284,13 @@ function showInGraph(id) {
 // ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
+/** `#/<id>/<level>` (a node route); `#/map` or `#/map/<id>` (the whole map,
+ * keeping the reading panel on `<id>` if given -- "Whole map" is a history
+ * step of its own, see navigateWholeMap below); or no hash at all (the
+ * welcome panel, `null`). */
 function parseHash() {
+  const map = /^#\/map(?:\/([^/]+))?$/.exec(location.hash);
+  if (map) return { map: true, id: map[1] ? decodeURIComponent(map[1]) : null };
   const m = /^#\/([^/]+)(?:\/([A-Za-z0-9]+))?$/.exec(location.hash);
   if (!m) return null;
   return { id: decodeURIComponent(m[1]), level: m[2] || 'L3' };
@@ -293,10 +300,29 @@ function navigate(id, level) {
   if (location.hash === target) applyRoute({ id, level });
   else location.hash = target;
 }
+/** "Whole map" button: pushes `#/map`, or `#/map/<id>` when a node is
+ * currently open, so the browser's Back returns to the view before the map
+ * was opened and Forward returns to the map -- previously this button
+ * changed only the graph, with no hash and no history entry at all. */
+function navigateWholeMap() {
+  const current = parseHash();
+  const id = current ? current.id : null;
+  const target = id ? `#/map/${encodeURIComponent(id)}` : '#/map';
+  if (location.hash === target) applyRoute(parseHash());
+  else location.hash = target;
+}
 function applyRoute(route) {
   if (!route) {
     renderWelcome();
     showInGraph(null);
+    return;
+  }
+  if (route.map) {
+    withGraph((g) => g.wholeMap(route.id || null));
+    if (!route.id) { renderWelcome(); return; }
+    const { data } = state;
+    const node = data.nodes[route.id] || data.externalNodes[route.id];
+    if (node) renderPanel(node, 'L3'); else renderMissing(route.id);
     return;
   }
   const { data } = state;
@@ -868,6 +894,63 @@ function initNotationPopovers(data) {
 }
 
 // ---------------------------------------------------------------------------
+// History navigation (a reader asked for "a button to go back a step...
+// given how complicated a network it is"): visible Back/Forward buttons
+// that simply call history.back()/history.forward(), so they can never
+// disagree with the browser's own. An in-app position counter travels in
+// history.state as {hcpIndex: n}: n=0 on the entry this page loaded with
+// (or whatever a same-session reload already carried), and the next n on
+// every entry after -- however it was created (navigate(), the brand
+// button, navigateWholeMap(), or an ordinary <a href="#/..."> in the panel
+// -- every one of them ends in a 'hashchange', the one place this is
+// tagged, via syncHistoryIndex). historyIndex/maxHistoryIndex are pure
+// bookkeeping: Back is disabled at n <= 0 (the site's own first entry --
+// this never navigates the reader off the site, whatever real history sits
+// behind it) and Forward at the highest n reached so far; a brand-new entry
+// always resets the ceiling to its own index, exactly as the browser itself
+// discards any old forward branch the moment a fresh entry is pushed from
+// the middle of history.
+// ---------------------------------------------------------------------------
+let historyIndex = 0;
+let maxHistoryIndex = 0;
+
+function updateHistoryNavButtons() {
+  const backDisabled = historyIndex <= 0;
+  const forwardDisabled = historyIndex >= maxHistoryIndex;
+  document.querySelectorAll('[data-history-nav="back"]').forEach((b) => { b.disabled = backDisabled; });
+  document.querySelectorAll('[data-history-nav="forward"]').forEach((b) => { b.disabled = forwardDisabled; });
+}
+
+/** Run on every hashchange after boot: an entry that already carries a
+ * numeric hcpIndex is one this app tagged before (a Back/Forward step of
+ * ours or the browser's own, or a same-entry replay); one that does not is
+ * brand new and gets the next index, tagged in place with replaceState
+ * (never a history entry of its own, and never fires hashchange/popstate). */
+function syncHistoryIndex() {
+  const cur = history.state;
+  if (cur && typeof cur.hcpIndex === 'number') {
+    historyIndex = cur.hcpIndex;
+    maxHistoryIndex = Math.max(maxHistoryIndex, historyIndex);
+  } else {
+    historyIndex += 1;
+    history.replaceState({ hcpIndex: historyIndex }, '', location.href);
+    maxHistoryIndex = historyIndex;
+  }
+  updateHistoryNavButtons();
+}
+
+function initHistoryNav() {
+  const cur = history.state;
+  const tagged = cur && typeof cur.hcpIndex === 'number';
+  historyIndex = tagged ? cur.hcpIndex : 0;
+  if (!tagged) history.replaceState({ hcpIndex: historyIndex }, '', location.href);
+  maxHistoryIndex = historyIndex;
+  updateHistoryNavButtons();
+  document.querySelectorAll('[data-history-nav="back"]').forEach((b) => b.addEventListener('click', () => history.back()));
+  document.querySelectorAll('[data-history-nav="forward"]').forEach((b) => b.addEventListener('click', () => history.forward()));
+}
+
+// ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
 async function main() {
@@ -875,6 +958,7 @@ async function main() {
   initTabs();
   initReading();
   initBrandHome();
+  initHistoryNav();
   if (state.devMode) document.getElementById('dev-indicator').hidden = false;
 
   const res = await fetch('data.json');
@@ -888,7 +972,7 @@ async function main() {
   initFigurePopouts();
   buildOutline(data);
 
-  window.addEventListener('hashchange', () => applyRoute(parseHash()));
+  window.addEventListener('hashchange', () => { syncHistoryIndex(); applyRoute(parseHash()); });
   applyRoute(parseHash());
 }
 

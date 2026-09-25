@@ -66,6 +66,8 @@
     <div id="cy" class="cy-canvas" tabindex="0" aria-label="Dependency graph. Plus and minus zoom, 0 fits the view."></div>
     <div id="outline" class="outline" hidden></div>
     <div class="graph-toolbar" role="toolbar" aria-label="Graph view">
+      <button type="button" class="graph-btn graph-btn--history" data-history-nav="back" aria-label="Back to the previous view (Alt+&larr;)" title="Back to the previous view (Alt+&larr;)">&larr; Back</button>
+      <button type="button" class="graph-btn graph-btn--history" data-history-nav="forward" aria-label="Forward to the next view (Alt+&rarr;)" title="Forward to the next view (Alt+&rarr;)">Forward &rarr;</button>
       <button type="button" class="graph-btn graph-btn--map" data-graph-action="whole-map" title="Back to the map of sections and theorems">Whole map</button>
       <div class="graph-hops" role="group" aria-label="How far to follow links" data-graph-hops hidden>
         <button type="button" class="graph-btn" data-graph-action="hops-1" aria-pressed="true">Direct links</button>
@@ -100,6 +102,7 @@
   <div class="pane-divider" role="separator" tabindex="0" aria-orientation="vertical" aria-controls="panel" aria-label="Resize the reading panel (arrow keys; double-click to reset)" aria-valuemin="25" aria-valuemax="85" aria-valuenow="40"></div>
 
   <section id="panel" class="pane pane--panel" aria-label="Reading panel" tabindex="-1">
+    <button type="button" class="graph-btn graph-btn--history reading-panel__back" data-history-nav="back" aria-label="Back to the previous view (Alt+&larr;)" title="Back to the previous view (Alt+&larr;)">&larr; Back</button>
     <div id="panel-content" class="panel-content">
       <div class="panel-empty">
         <p>Select a node in the graph, or search above, to read its statement and proof.</p>

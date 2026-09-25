@@ -695,15 +695,19 @@ function buildStylesheet(cssVar, fontGen = 0) {
  *   labelOf(id) -> {number, title} as plain text
  *   cssVar(name) -> current value of a theme token
  *   navigate(id) -- open `id` in the reading panel (updates the route)
+ *   onWholeMap() -- optional; the "Whole map" button was clicked (updates
+ *     the route to make it a history step -- tasks/p16 "Back" button).
+ *     Falls back to the plain internal wholeMap() when not given (e.g. a
+ *     bare controller in a test), so the button still works either way.
  * Views: the whole map (L0, everything closed); an opened cluster
  * (clusterView: its contents, with sub-clusters opened in place, and its
  * direct outside links as context); a result's focus (focusGraph).
- * Returns {show(id|null), wholeMap(), setHops(n), setShowAkhc(bool),
+ * Returns {show(id|null), wholeMap(selectedId?), setHops(n), setShowAkhc(bool),
  * zoomBy(f), fit(), zoomToSelection(), resize(), refreshStyle(), cy}.
  */
 export function createGraphController(opts) {
   const {
-    cytoscape, container, pane, data, labelOf, cssVar, navigate,
+    cytoscape, container, pane, data, labelOf, cssVar, navigate, onWholeMap,
   } = opts;
   const index = buildGraphIndex(data);
   const cy = cytoscape({
@@ -1076,12 +1080,17 @@ export function createGraphController(opts) {
     fitView(true);
   }
 
-  function wholeMap() {
+  /** `selectedId` (tasks/p16 "Back" button): "Whole map" keeps the reading
+   * panel on whatever node was open, so the map should still mark it (its
+   * nearest visible ancestor -- markSelection/selectedEle already do that)
+   * rather than showing no selection at all. */
+  function wholeMap(selectedId = null) {
     st.mode = 'overview';
     st.subject = null;
     st.expanded = new Set();
     st.snapshots.clear();
     st.zoomTarget = null;
+    st.selectedId = selectedId;
     render();
     fitView(true);
   }
@@ -1167,7 +1176,7 @@ export function createGraphController(opts) {
       else if (a === 'zoom-out') zoomBy(1 / 1.3);
       else if (a === 'fit') fitView(true);
       else if (a === 'zoom-selection') zoomToSelection();
-      else if (a === 'whole-map') wholeMap();
+      else if (a === 'whole-map') { if (onWholeMap) onWholeMap(); else wholeMap(); }
       else if (a === 'hops-1') setHops(1);
       else if (a === 'hops-2') setHops(2);
     });
