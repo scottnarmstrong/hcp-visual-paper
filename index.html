@@ -69,6 +69,10 @@
       <button type="button" class="graph-btn graph-btn--history" data-history-nav="back" aria-label="Back to the previous view (Alt+&larr;)" title="Back to the previous view (Alt+&larr;)">&larr; Back</button>
       <button type="button" class="graph-btn graph-btn--history" data-history-nav="forward" aria-label="Forward to the next view (Alt+&rarr;)" title="Forward to the next view (Alt+&rarr;)">Forward &rarr;</button>
       <button type="button" class="graph-btn graph-btn--map" data-graph-action="whole-map" title="Back to the map of sections and theorems">Whole map</button>
+      <div class="graph-tiers" role="group" aria-label="How much of the graph to show" data-graph-view-switch>
+        <button type="button" class="graph-btn" data-graph-action="view-essentials" aria-pressed="true" title="The main results and how each is used to prove the next">Essentials</button>
+        <button type="button" class="graph-btn" data-graph-action="view-everything" aria-pressed="false" title="Every result, definition and link">Everything</button>
+      </div>
       <div class="graph-hops" role="group" aria-label="How far to follow links" data-graph-hops hidden>
         <button type="button" class="graph-btn" data-graph-action="hops-1" aria-pressed="true">Direct links</button>
         <button type="button" class="graph-btn" data-graph-action="hops-2" aria-pressed="false">One step further</button>
@@ -83,7 +87,14 @@
       <button type="button" class="graph-btn graph-btn--icon" data-graph-action="zoom-selection" aria-label="Zoom to the selection" title="Zoom to the selection"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="5.2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="1.8" fill="currentColor"/></svg></button>
     </div>
     <div class="graph-legend">
-      <div class="graph-legend__row">
+      <div class="graph-legend__row graph-legend__row--essentials">
+        <span aria-hidden="true"><i class="legend-swatch legend-swatch--theorem"></i>Theorem</span>
+        <span aria-hidden="true"><i class="legend-swatch legend-swatch--major"></i>Major result</span>
+        <span aria-hidden="true"><i class="legend-swatch legend-swatch--result"></i>Supporting result</span>
+        <span aria-hidden="true"><i class="legend-swatch legend-swatch--definition"></i>Definition</span>
+        <span aria-hidden="true"><i class="legend-swatch legend-swatch--lean"></i>Lean &#10003;</span>
+      </div>
+      <div class="graph-legend__row graph-legend__row--everything">
         <span aria-hidden="true"><i class="legend-swatch legend-swatch--theorem"></i>Theorem</span>
         <span aria-hidden="true"><i class="legend-swatch legend-swatch--section"></i>Section</span>
         <span aria-hidden="true"><i class="legend-swatch legend-swatch--result"></i>Lemma / Proposition</span>
@@ -94,6 +105,7 @@
       </div>
       <div class="graph-legend__row">
         <span class="graph-legend__key">A &rarr; B: A is used in the proof of B</span>
+        <span class="graph-legend__key graph-legend__key--essentials"><i class="legend-arrow" aria-hidden="true"></i>used to prove (possibly via hidden results)</span>
         <label class="graph-legend__toggle"><input type="checkbox" data-graph-akhc> Show [AK25] links</label>
       </div>
     </div>

@@ -991,9 +991,9 @@ function buildOutline(data) {
     const kids = byParent[parentId] || [];
     if (kids.length === 0) return '';
     return `<ul>${kids.map((n) => `
-      <li class="${n.kind === 'external' ? 'outline__ext' : ''}">
+      <li class="${[n.kind === 'external' ? 'outline__ext' : '', n.tier === 'major' ? 'outline__major' : '', n.tier === 'background' && n.kind !== 'external' ? 'outline__background' : ''].filter(Boolean).join(' ')}">
         <button type="button" data-id="${escapeHtml(n.id)}">
-          <span class="outline__num">${escapeHtml(plainText(n.numberHtml))}</span>${escapeHtml(plainText(n.titleHtml) || n.id)}${n.lean ? '<span class="lean-check" title="Formalized in Lean">&#10003;</span>' : ''}
+          <span class="outline__num">${escapeHtml(plainText(n.numberHtml))}</span>${escapeHtml(plainText(n.titleHtml) || n.id)}${n.lean ? '<span class="lean-check" title="Formalized in Lean">&#10003;</span>' : ''}${n.tier === 'major' ? '<span class="outline__tag">major</span>' : ''}
         </button>
         ${renderLevel(n.id)}
       </li>`).join('')}</ul>`;

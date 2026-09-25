@@ -19,7 +19,10 @@
 // node that uses it, the reverse of the stored data's `from` (user) -> `to`
 // (used), which is never changed.
 //   - viewportFor / wheelZoomFactor / placeContext: fitting, zoom and
-//     context-placement maths.
+//     context-placement maths;
+//   - essentialsMap / essentialsIndex (tasks/p17-essentials.md): the default
+//     "Essentials" view -- the major results in section bands joined by the
+//     build's proof skeleton, and opened sections without their definitions.
 // The second half, createGraphController, drives one cytoscape instance
 // with those pieces: it rebuilds the elements for each view (whole map,
 // opened cluster, focus), lays them out, and sets the viewport itself.
@@ -84,6 +87,7 @@ export function buildGraphIndex(data) {
       level: n.level,
       kind: n.kind,
       akhc: isAkhcNode(n),
+      tier: n.tier || null,
     });
   }
   for (const n of nodes.values()) {
@@ -121,7 +125,14 @@ export function buildGraphIndex(data) {
     out.get(e.from).push(e);
     inn.get(e.to).push(e);
   }
-  return { nodes, children, clusters, edges, out, in: inn };
+  // The build's proof homes (a result proved in another box: Theorem A in Subsection
+  // 5.4) and proof skeleton between major results (tasks/p17-essentials.md).
+  const proofHome = new Map();
+  for (const e of data.edges || []) if (e.proofHome && nodes.has(e.from) && nodes.has(e.to)) proofHome.set(e.from, e.to);
+  const skeleton = (data.skeleton || []).filter((s) => nodes.has(s.from) && nodes.has(s.to));
+  return {
+    nodes, children, clusters, edges, out, in: inn, proofHome, skeleton,
+  };
 }
 
 /** Ancestors of `id`, outermost first (not including `id`). */
@@ -284,6 +295,201 @@ export function gridHelperEdges(graph, { maxColumns = 7 } = {}) {
     for (let i = 0; i + cols < ids.length; i++) helpers.push({ source: ids[i], target: ids[i + cols] });
   }
   return helpers;
+}
+
+// ---------------------------------------------------------------------------
+// Essentials (tasks/p17-essentials.md): the major results and the proof skeleton
+// ---------------------------------------------------------------------------
+
+/** The section (L0 box) holding `id` in the paper, or null (a top-level theorem). */
+export function sectionOf(index, id) {
+  const seen = new Set();
+  for (let cur = id; cur && !seen.has(cur); cur = (index.nodes.get(cur) || {}).paperParent) {
+    seen.add(cur);
+    const n = index.nodes.get(cur);
+    if (n && n.kind === 'section') return cur;
+  }
+  return null;
+}
+
+/** The section band a major result sits in on the essentials map: its own section,
+ * or for a top-level theorem the section holding its proof (Theorem A: Section 5). */
+export function bandOf(index, id) {
+  const own = sectionOf(index, id);
+  if (own) return own;
+  const home = index.proofHome.get(id);
+  return home ? sectionOf(index, home) : null;
+}
+
+/**
+ * The essentials whole map: the major results, each inside its section band
+ * (bandOf), joined by the build's reduced proof skeleton. Returns
+ *   nodes: [{id, parent, band}]  -- bands first, in paper order
+ *   edges: [{source, target, kind: 'skeleton', via}]  -- as drawn: used -> user
+ */
+export function essentialsMap(index) {
+  const major = [...index.nodes.values()].filter((n) => n.tier === 'major').map((n) => n.id);
+  const bands = new Set();
+  const items = major.map((id) => {
+    const band = bandOf(index, id);
+    if (band) bands.add(band);
+    return { id, parent: band, band: false };
+  });
+  const bandNodes = [...index.nodes.keys()].filter((id) => bands.has(id)).map((id) => ({ id, parent: null, band: true }));
+  const shown = new Set(major);
+  const edges = index.skeleton
+    .filter((s) => shown.has(s.from) && shown.has(s.to))
+    .map((s) => ({
+      source: s.from, target: s.to, kind: 'skeleton', via: s.via || [],
+    }));
+  return { nodes: [...bandNodes, ...items], edges };
+}
+
+/**
+ * Positions for the essentials whole map, so that it reads like text: one row per
+ * section band, the bands top to bottom in the order the proof runs through them
+ * (by the earliest skeleton depth of their results, then paper order), and inside a
+ * band its results left to right by skeleton depth -- results of equal depth stacked
+ * in one column, so no arrow runs along a row behind another box. Each row is centred,
+ * then slid (within the widest row's extent) towards the results above that it uses,
+ * to keep the arrows between bands short. `sizeOf(id)` -> {w, h}. Returns Map id ->
+ * {x, y} for the results (a band's box follows from its results).
+ */
+export function essentialsLayout(graph, sizeOf, { colGap = 30, rowGap = 50, stackGap = 12 } = {}) {
+  const items = graph.nodes.filter((n) => !n.band);
+  const order = new Map(graph.nodes.map((n, i) => [n.id, i]));
+  // Longest path from a source along the (acyclic) skeleton.
+  const depth = new Map(items.map((n) => [n.id, 0]));
+  for (let pass = 0; pass < items.length; pass++) {
+    let changed = false;
+    for (const e of graph.edges) {
+      if (!depth.has(e.source) || !depth.has(e.target)) continue;
+      const d = depth.get(e.source) + 1;
+      if (d > depth.get(e.target)) { depth.set(e.target, d); changed = true; }
+    }
+    if (!changed) break;
+  }
+  const rows = new Map();
+  for (const n of items) {
+    const key = n.parent || n.id;
+    if (!rows.has(key)) rows.set(key, []);
+    rows.get(key).push(n.id);
+  }
+  const byDepthThenPaper = (a, b) => (depth.get(a) - depth.get(b)) || (order.get(a) - order.get(b));
+  const list = [...rows.entries()].map(([key, ids]) => ({ key, ids: ids.sort(byDepthThenPaper) }));
+  list.sort((a, b) => (depth.get(a.ids[0]) - depth.get(b.ids[0])) || (order.get(a.key) - order.get(b.key)));
+  // Each row: columns of equal depth.
+  for (const row of list) {
+    row.cols = [];
+    for (const id of row.ids) {
+      const last = row.cols[row.cols.length - 1];
+      if (last && depth.get(last.ids[0]) === depth.get(id)) last.ids.push(id);
+      else row.cols.push({ ids: [id] });
+    }
+    for (const col of row.cols) {
+      const sizes = col.ids.map((id) => sizeOf(id));
+      col.sizes = sizes;
+      col.w = Math.max(...sizes.map((z) => z.w));
+      col.h = sizes.reduce((sum, z) => sum + z.h, 0) + stackGap * (sizes.length - 1);
+    }
+    row.w = row.cols.reduce((sum, c) => sum + c.w, 0) + colGap * (row.cols.length - 1);
+    row.h = Math.max(...row.cols.map((c) => c.h));
+  }
+  const widest = Math.max(...list.map((r) => r.w));
+  const into = new Map();
+  for (const e of graph.edges) {
+    if (!into.has(e.target)) into.set(e.target, []);
+    into.get(e.target).push(e.source);
+  }
+  const pos = new Map();
+  let top = 0;
+  for (const row of list) {
+    const local = new Map();
+    let x = -row.w / 2;
+    for (const col of row.cols) {
+      let y = top + (row.h - col.h) / 2;
+      col.ids.forEach((id, i) => {
+        local.set(id, { x: x + col.w / 2, y: y + col.sizes[i].h / 2 });
+        y += col.sizes[i].h + stackGap;
+      });
+      x += col.w + colGap;
+    }
+    const pulls = [];
+    for (const id of row.ids) {
+      for (const src of into.get(id) || []) if (pos.has(src)) pulls.push(pos.get(src).x - local.get(id).x);
+    }
+    const room = (widest - row.w) / 2;
+    const shift = pulls.length ? Math.max(-room, Math.min(room, pulls.reduce((a, b) => a + b, 0) / pulls.length)) : 0;
+    for (const [id, p] of local) pos.set(id, { x: p.x + shift, y: p.y });
+    top += row.h + rowGap;
+  }
+  return pos;
+}
+
+/**
+ * The index an opened section uses in the essentials view: `data` without its
+ * background results (definitions) and plain external leaves -- the [AK25] layer
+ * stays, behind its own toggle -- and without the sections/subsections that
+ * removal leaves empty.
+ */
+export function essentialsIndex(data) {
+  const all = { ...(data.nodes || {}), ...(data.externalNodes || {}) };
+  const kids = new Map();
+  for (const n of Object.values(all)) {
+    if (!n.parent || !all[n.parent]) continue;
+    if (!kids.has(n.parent)) kids.set(n.parent, []);
+    kids.get(n.parent).push(n.id);
+  }
+  const hiddenLeaf = (n) => n.tier === 'background' && !isAkhcNode(n);
+  const memo = new Map();
+  const hidden = (id, depth = 0) => {
+    if (memo.has(id)) return memo.get(id);
+    const n = all[id];
+    let h = hiddenLeaf(n);
+    const ks = kids.get(id);
+    if (!h && ks && ks.length && (n.kind === 'section' || n.kind === 'subsection') && depth < 32) {
+      h = ks.every((k) => hidden(k, depth + 1));
+    }
+    memo.set(id, h);
+    return h;
+  };
+  const keep = (obj) => Object.fromEntries(Object.entries(obj || {}).filter(([id]) => !hidden(id)));
+  const nodes = keep(data.nodes);
+  const externalNodes = keep(data.externalNodes);
+  const has = (id) => id in nodes || id in externalNodes;
+  return buildGraphIndex({
+    ...data,
+    nodes,
+    externalNodes,
+    edges: (data.edges || []).filter((e) => has(e.from) && has(e.to)),
+  });
+}
+
+/**
+ * An opened cluster in the essentials view: its visible contents and the arrows
+ * among them, exactly as clusterView draws them, without the outside context --
+ * the closed boxes and results elsewhere that its contents link to, whose many
+ * long thin arrows would bury the section's own. (A result's focus still shows
+ * everything it uses and everything using it.) Same shape as clusterView.
+ */
+export function essentialsClusterView(index, subject, expanded, opts = {}) {
+  const g = clusterView(index, subject, expanded, opts);
+  const nodes = g.nodes.filter((n) => !n.context);
+  const shown = new Set(nodes.map((n) => n.id));
+  return { nodes, edges: g.edges.filter((e) => shown.has(e.source) && shown.has(e.target)) };
+}
+
+/** Every cluster inside `id` (not `id` itself), in `index`. */
+export function clustersInside(index, id) {
+  const out = [];
+  const stack = [...(index.children.get(id) || [])];
+  while (stack.length) {
+    const c = stack.pop();
+    if (!index.clusters.has(c)) continue;
+    out.push(c);
+    stack.push(...(index.children.get(c) || []));
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -548,9 +754,32 @@ export function wheelZoomFactor({ deltaY = 0, deltaMode = 0, ctrlKey = false } =
   return Math.min(2, Math.max(0.5, f));
 }
 
+/**
+ * The words shown on hovering a skeleton arrow `from` -> `to` (from is used to prove
+ * to) that passes through the results `via` (hidden supporting results);
+ * `nameOf(id)` gives a result's plain-text name.
+ */
+export function skeletonEdgeText(from, to, via, nameOf) {
+  if (!via || !via.length) return `${nameOf(from)} is used directly in the proof of ${nameOf(to)}.`;
+  const head = `${nameOf(from)} is used to prove ${nameOf(to)}`;
+  const names = via.map(nameOf);
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  return `${head}, via ${list}.`;
+}
+
 // ---------------------------------------------------------------------------
 // Controller (DOM + cytoscape). Everything above is pure.
 // ---------------------------------------------------------------------------
+
+/** The reader's "Essentials / Everything" choice, remembered across visits; storage
+ * that throws (a private window, blocked site data) just means the default. */
+const VIEW_STORAGE_KEY = 'hcp-graph-view';
+function readViewPreference() {
+  try { return localStorage.getItem(VIEW_STORAGE_KEY); } catch { return null; }
+}
+function writeViewPreference(v) {
+  try { localStorage.setItem(VIEW_STORAGE_KEY, v); } catch { /* not remembered */ }
+}
 
 function truncate(s, max) {
   const t = String(s || '').trim();
@@ -639,10 +868,33 @@ function buildStylesheet(cssVar, fontGen = 0) {
       'text-valign': 'top', 'text-halign': 'center', 'text-margin-y': -4, 'text-events': 'yes',
       'background-opacity': 0.4, padding: '18px', 'font-size': 14, 'font-weight': 600,
     } },
+    { selector: 'node.band-label', style: {
+      shape: 'rectangle', 'background-opacity': 0, 'border-width': 0, width: 'label', height: 'label', padding: '2px',
+      'font-size': 13, 'font-weight': 600, color: cssVar('--text-dim'), 'text-max-width': '120px', 'text-justify': 'right',
+    } },
+    { selector: 'node.band', style: {
+      'background-color': cssVar('--surface'), 'background-opacity': 0.5, 'border-width': 1, 'border-style': 'solid',
+      'border-color': cssVar('--border'), color: cssVar('--text-dim'), 'font-size': 13, 'font-weight': 600, padding: '14px',
+      'text-max-width': '600px', 'text-wrap': 'none',
+    } },
     { selector: 'node.fnode', style: {
       width: 184, height: 40, 'text-max-width': '174px', padding: '4px', 'font-size': 12,
     } },
     { selector: 'node.fnode.lvl-L0', style: { 'font-weight': 600 } },
+    // Essentials (tasks/p17-essentials.md): the ess-* classes are set only in that view,
+    // so "Everything" draws exactly as before. Major results stand out (bold, a strong
+    // border in the theorem colour); definitions are small grey boxes.
+    { selector: 'node.ess-major', style: { 'border-width': 3, 'border-color': cssVar('--accent'), 'font-weight': 700 } },
+    { selector: 'node.ess-major.lvl-L2', style: { 'background-color': cssVar('--surface'), color: cssVar('--text') } },
+    { selector: 'node.ess-major.theorem', style: { 'border-color': cssVar('--accent-strong') } },
+    { selector: 'node.ess-map', style: {
+      width: 158, height: 'label', 'font-size': 14, 'text-max-width': '150px', padding: '8px',
+    } },
+    { selector: 'node.ess-background', style: {
+      'background-color': cssVar('--surface-2'), 'border-color': cssVar('--border'), 'border-width': 1,
+      color: cssVar('--text-dim'), 'font-size': 10.5, 'font-weight': 400,
+    } },
+    { selector: 'node.fnode.ess-background', style: { width: 150, height: 30, 'text-max-width': '142px', padding: '2px' } },
     { selector: 'node.focus', style: {
       width: 220, height: 'label', 'text-max-width': '204px', padding: '10px', 'font-size': 14, 'font-weight': 600,
       'border-width': 3, 'border-color': cssVar('--focus-ring'),
@@ -677,6 +929,14 @@ function buildStylesheet(cssVar, fontGen = 0) {
     { selector: 'edge.f-out', style: { 'curve-style': 'taxi', 'taxi-direction': 'rightward', 'taxi-turn': '30px', 'taxi-radius': 10, 'taxi-turn-min-distance': 6 } },
     { selector: 'edge.f-in', style: { 'curve-style': 'taxi', 'taxi-direction': 'rightward', 'taxi-turn': '-30px', 'taxi-radius': 10, 'taxi-turn-min-distance': 6 } },
     { selector: 'edge.layout-helper', style: { visibility: 'hidden', events: 'no' } },
+    { selector: 'edge.ess-edge', style: { width: 1.8, opacity: 0.8, 'line-color': cssVar('--text-dim'), 'target-arrow-color': cssVar('--text-dim'), 'source-arrow-color': cssVar('--text-dim') } },
+    { selector: 'edge.skeleton', style: {
+      width: 3.2, 'line-color': cssVar('--text'), 'target-arrow-color': cssVar('--text'), 'arrow-scale': 1.1, opacity: 0.8,
+    } },
+    { selector: 'edge.bg-edge', style: {
+      width: 0.9, 'line-style': 'dashed', 'line-dash-pattern': [4, 3], 'line-color': cssVar('--border'),
+      'target-arrow-color': cssVar('--border'), 'arrow-scale': 0.7, opacity: 0.9,
+    } },
     { selector: 'edge.ctx-edge', style: { opacity: 0.4, width: 1.2 } },
     { selector: 'node.faded', style: { opacity: 0.25 } },
     { selector: 'edge.faded', style: { opacity: 0.1 } },
@@ -702,7 +962,12 @@ function buildStylesheet(cssVar, fontGen = 0) {
  * Views: the whole map (L0, everything closed); an opened cluster
  * (clusterView: its contents, with sub-clusters opened in place, and its
  * direct outside links as context); a result's focus (focusGraph).
+ * In "Essentials" (the default, tasks/p17-essentials.md) the whole map is the major
+ * results in section bands joined by the proof skeleton, an opened section leaves
+ * out its definitions, and a focus styles its nodes by tier; "Everything" draws
+ * every view exactly as before. The choice is remembered (localStorage).
  * Returns {show(id|null), wholeMap(selectedId?), setHops(n), setShowAkhc(bool),
+ * setEssentials(bool), isEssentials(),
  * zoomBy(f), fit(), zoomToSelection(), resize(), refreshStyle(), cy}.
  */
 export function createGraphController(opts) {
@@ -710,6 +975,10 @@ export function createGraphController(opts) {
     cytoscape, container, pane, data, labelOf, cssVar, navigate, onWholeMap,
   } = opts;
   const index = buildGraphIndex(data);
+  // Essentials (tasks/p17-essentials.md): an opened section drawn without its
+  // definitions, from an index built without them (lazily, on first use).
+  let essIdx = null;
+  const essIndex = () => essIdx || (essIdx = essentialsIndex(data));
   const cy = cytoscape({
     container,
     elements: [],
@@ -734,7 +1003,29 @@ export function createGraphController(opts) {
     snapshots: new Map(), // cluster id -> overview state to return to when it closes
     pendingFit: false, // a fit was asked for while the canvas had no size (phone width)
     userMoved: false, // the reader zoomed or panned since the last fit
+    essentials: readViewPreference() !== 'everything', // "Essentials" (the default) or "Everything"
   };
+
+  /** The index the current overview is drawn from: in Essentials, an opened
+   * cluster without its definitions (unless it holds nothing else, like the
+   * standing definitions of Subsection 1.1: then it shows them). */
+  function indexFor(subject) {
+    return st.essentials && subject && essIndex().clusters.has(subject) ? essIndex() : index;
+  }
+  /** The clusters open when `id` is opened as a view's subject: just itself, or
+   * in Essentials everything inside it too (a section shows all its results). */
+  function initialExpanded(id) {
+    const open = new Set([id]);
+    if (st.essentials) for (const c of clustersInside(indexFor(id), id)) open.add(c);
+    return open;
+  }
+  /** Tier classes, in Essentials only (Everything draws exactly as before). */
+  function tierClasses(id) {
+    if (!st.essentials) return [];
+    const n = index.nodes.get(id);
+    if (n && n.tier) return [`ess-${n.tier}`];
+    return n && (n.akhc || n.kind === 'external') ? ['ess-background'] : [];
+  }
 
   const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -758,21 +1049,62 @@ export function createGraphController(opts) {
   }
 
   // ---- building each view ---------------------------------------------------
+  /** The Essentials whole map: the major results in their section bands, joined by
+   * the proof skeleton (thick arrows; hovering one names the results it passes
+   * through). A band is not an opened cluster: clicking it opens its section. */
+  function essentialsElements() {
+    const g = essentialsMap(index);
+    const els = [];
+    for (const n of g.nodes) {
+      const t = textOf(n.id);
+      if (n.band) {
+        // The band's name sits in a column of row headings to the left of the map
+        // (layoutOverview), where no arrow crosses it; clicking either opens the section.
+        els.push({ group: 'nodes', data: { id: n.id, label: '' }, classes: 'band cluster' });
+        els.push({
+          group: 'nodes',
+          data: { id: `band-label:${n.id}`, opens: n.id, label: [t.number, t.title].filter(Boolean).join('\n') },
+          classes: 'band-label',
+        });
+        continue;
+      }
+      const classes = [...nodeClasses(raw(n.id)), ...tierClasses(n.id), 'ess-map'];
+      els.push({
+        group: 'nodes',
+        data: { id: n.id, parent: n.parent || undefined, label: nodeLabel(t, { maxTitle: 40 }) },
+        classes: classes.join(' '),
+      });
+    }
+    for (const e of g.edges) {
+      els.push({
+        group: 'edges',
+        data: {
+          id: `s:${e.source}>${e.target}`, source: e.source, target: e.target, via: e.via,
+        },
+        classes: 'skeleton',
+      });
+    }
+    return els;
+  }
+
   function overviewElements() {
+    if (st.essentials && !st.subject) return essentialsElements();
+    const idx = indexFor(st.subject);
+    const view = st.essentials && idx === essIdx ? essentialsClusterView : clusterView;
     const g = st.subject
-      ? clusterView(index, st.subject, st.expanded, { showAkhc: st.showAkhc, mergeMutual: true })
+      ? view(idx, st.subject, st.expanded, { showAkhc: st.showAkhc, mergeMutual: true })
       : overviewGraph(index, new Set(), { showAkhc: st.showAkhc, refs: false, mergeMutual: true });
     const shown = new Set(g.nodes.map((n) => n.id));
     const els = [];
     for (const n of g.nodes) {
-      const classes = nodeClasses(raw(n.id));
+      const classes = [...nodeClasses(raw(n.id)), ...tierClasses(n.id)];
       if (n.cluster) classes.push(n.expanded ? 'expanded' : 'collapsed', 'cluster');
       if (n.context) classes.push('context');
       const t = textOf(n.id, { inCluster: !!(n.parent && shown.has(n.parent)) });
       const label = n.expanded
         ? [t.number, t.title].filter(Boolean).join('  ')
         : nodeLabel(t, {
-          childCount: (index.children.get(n.id) || []).length,
+          childCount: (idx.children.get(n.id) || []).length,
           collapsedCluster: n.cluster,
           akhcCluster: index.nodes.get(n.id).kind === 'external',
         });
@@ -786,6 +1118,7 @@ export function createGraphController(opts) {
     g.edges.forEach((e) => {
       const cls = [e.kind];
       if (e.mutual) cls.push('mutual');
+      if (st.essentials) cls.push('ess-edge');
       if (ctx.has(e.source) || ctx.has(e.target)) cls.push('ctx-edge');
       els.push({ group: 'edges', data: { id: `o:${e.source}>${e.target}`, source: e.source, target: e.target, count: e.count }, classes: cls.join(' ') });
     });
@@ -799,8 +1132,9 @@ export function createGraphController(opts) {
     const g = focusGraph(index, st.focusId, { hops: st.hops, showAkhc: st.showAkhc });
     const { positions, headers } = focusLayout(g);
     const els = [];
+    const background = (id) => tierClasses(id).includes('ess-background');
     for (const n of g.nodes) {
-      const classes = nodeClasses(raw(n.id));
+      const classes = [...nodeClasses(raw(n.id)), ...tierClasses(n.id)];
       classes.push('fnode', `side-${n.side}`);
       if (n.side === 'focus') classes.push('focus');
       const label = nodeLabel(textOf(n.id), { maxTitle: n.side === 'focus' ? 90 : 25 });
@@ -817,6 +1151,7 @@ export function createGraphController(opts) {
     g.edges.forEach((e) => {
       const cls = [e.kind];
       if (e.dist === 1) cls.push(e.source === st.focusId ? 'f-out' : 'f-in');
+      if (background(e.source) || background(e.target)) cls.push('bg-edge');
       els.push({ group: 'edges', data: { id: `f:${e.source}>${e.target}`, source: e.source, target: e.target }, classes: cls.join(' ') });
     });
     return els;
@@ -825,6 +1160,7 @@ export function createGraphController(opts) {
   function render() {
     st.hoverId = null;
     cy.stop();
+    if (tipEl) tipEl.hidden = true;
     cy.batch(() => {
       cy.elements().remove();
       cy.add(st.mode === 'focus' ? focusElements() : overviewElements());
@@ -852,6 +1188,22 @@ export function createGraphController(opts) {
    * links to anything else inside), then its outside context placed around
    * it (placeContext). */
   function layoutOverview() {
+    if (!st.subject && st.essentials) {
+      const leaves = cy.nodes().not(':parent');
+      const pos = essentialsLayout(essentialsMap(index), (id) => {
+        const d = cy.getElementById(id).layoutDimensions({ nodeDimensionsIncludeLabels: true });
+        return { w: d.w, h: d.h };
+      });
+      leaves.forEach((n) => { if (pos.has(n.id())) n.position(pos.get(n.id())); });
+      cy.nodes('.band').forEach((b) => {
+        const label = cy.getElementById(`band-label:${b.id()}`);
+        if (label.empty()) return;
+        const bb = b.boundingBox();
+        const w = label.layoutDimensions({ nodeDimensionsIncludeLabels: true }).w;
+        label.position({ x: bb.x1 - 12 - w / 2, y: (bb.y1 + bb.y2) / 2 });
+      });
+      return;
+    }
     if (!st.subject) {
       cy.layout(DAGRE).run();
       return;
@@ -1035,7 +1387,7 @@ export function createGraphController(opts) {
       st.expanded.add(id);
     } else if (!(st.mode === 'overview' && st.subject === id)) {
       st.subject = id;
-      st.expanded = new Set([id]);
+      st.expanded = initialExpanded(id);
     }
     if (before && !(before.subject === st.subject && before.expanded.has(id) && !inPlace)) st.snapshots.set(id, before);
     else if (!before) st.snapshots.delete(id);
@@ -1060,7 +1412,7 @@ export function createGraphController(opts) {
     if (id === st.subject) {
       const up = ancestorsOf(index, id).filter((a) => isOpenableCluster(index, a)).pop() || null;
       st.subject = up;
-      st.expanded = up ? new Set([up]) : new Set();
+      st.expanded = up ? initialExpanded(up) : new Set();
       st.zoomTarget = up;
     } else {
       st.expanded.delete(id);
@@ -1113,8 +1465,15 @@ export function createGraphController(opts) {
   const hopsGroup = q('[data-graph-hops]');
   const hintEl = q('[data-graph-hint]');
   const akhcToggle = q('[data-graph-akhc]');
+  const tiersGroup = q('[data-graph-view-switch]');
 
   function syncControls() {
+    if (tiersGroup) {
+      tiersGroup.querySelectorAll('[data-graph-action^="view-"]').forEach((b) => {
+        b.setAttribute('aria-pressed', String(b.dataset.graphAction === (st.essentials ? 'view-essentials' : 'view-everything')));
+      });
+    }
+    if (pane) pane.dataset.graphTiers = st.essentials ? 'essentials' : 'everything';
     if (hopsGroup) {
       hopsGroup.hidden = st.mode !== 'focus';
       hopsGroup.querySelectorAll('[data-graph-action^="hops-"]').forEach((b) => {
@@ -1124,6 +1483,8 @@ export function createGraphController(opts) {
     if (akhcToggle) akhcToggle.checked = st.showAkhc;
     if (hintEl) {
       if (st.mode === 'focus') hintEl.textContent = 'Left: what it uses. Right: what uses it. Click any box to go there.';
+      else if (st.essentials && !st.subject) hintEl.textContent = 'The main results and how each is used to prove the next. Click a section to see its supporting results.';
+      else if (st.essentials) hintEl.textContent = 'Definitions are hidden here. Click a result to see everything it uses, or a heading to close it.';
       else if (st.subject) hintEl.textContent = 'Click a part to open it, or its heading to close it. Faded boxes outside link in or out.';
       else hintEl.textContent = 'Click a section to open it. Click a theorem to see what it uses and what uses it.';
     }
@@ -1167,6 +1528,18 @@ export function createGraphController(opts) {
     fitView(false);
   }
 
+  /** "Essentials / Everything": redraw the current view in the other mode. */
+  function setEssentials(on) {
+    const want = !!on;
+    writeViewPreference(want ? 'essentials' : 'everything');
+    if (want === st.essentials) return;
+    st.essentials = want;
+    st.snapshots.clear();
+    if (st.mode === 'overview' && st.subject) st.expanded = initialExpanded(st.subject);
+    render();
+    fitView(true);
+  }
+
   if (pane) {
     pane.addEventListener('click', (e) => {
       const b = e.target.closest('[data-graph-action]');
@@ -1179,6 +1552,8 @@ export function createGraphController(opts) {
       else if (a === 'whole-map') { if (onWholeMap) onWholeMap(); else wholeMap(); }
       else if (a === 'hops-1') setHops(1);
       else if (a === 'hops-2') setHops(2);
+      else if (a === 'view-essentials') setEssentials(true);
+      else if (a === 'view-everything') setEssentials(false);
     });
     if (akhcToggle) akhcToggle.addEventListener('change', () => setShowAkhc(akhcToggle.checked));
     // Keyboard zoom while the graph (or one of its controls) has focus.
@@ -1206,7 +1581,7 @@ export function createGraphController(opts) {
   cy.on('tap', 'node', (evt) => {
     const n = evt.target;
     if (n.hasClass('header')) return;
-    const id = n.id();
+    const id = n.data('opens') || n.id();
     if (st.mode === 'overview' && n.hasClass('cluster') && n.hasClass('expanded')) {
       closeCluster(id);
       return;
@@ -1227,6 +1602,40 @@ export function createGraphController(opts) {
   });
 
   cy.on('dragpan pinchzoom scrollzoom', () => { st.userMoved = true; });
+
+  // A skeleton arrow (Essentials whole map) names, on hover or tap, the hidden
+  // results it passes through.
+  const tipEl = pane && typeof document !== 'undefined' ? document.createElement('div') : null;
+  if (tipEl) {
+    tipEl.className = 'graph-tip';
+    tipEl.setAttribute('role', 'tooltip');
+    tipEl.hidden = true;
+    pane.appendChild(tipEl);
+  }
+  const nameOf = (id) => {
+    const t = textOf(id);
+    return t.number || t.title || id;
+  };
+  function showTip(edge, at) {
+    if (!tipEl) return;
+    cy.edges('.tip-hl').removeClass('tip-hl hl');
+    edge.addClass('tip-hl hl');
+    tipEl.textContent = skeletonEdgeText(edge.data('source'), edge.data('target'), edge.data('via'), nameOf);
+    tipEl.hidden = false;
+    const w = container.clientWidth;
+    const x = Math.max(8, Math.min(at.x + 14, w - tipEl.offsetWidth - 8));
+    const y = at.y + 16 + tipEl.offsetHeight > container.clientHeight ? at.y - tipEl.offsetHeight - 10 : at.y + 16;
+    tipEl.style.left = `${x}px`;
+    tipEl.style.top = `${Math.max(8, y)}px`;
+  }
+  function hideTip() {
+    if (tipEl) tipEl.hidden = true;
+    cy.edges('.tip-hl').removeClass('tip-hl hl');
+  }
+  cy.on('mouseover tap', 'edge.skeleton', (evt) => showTip(evt.target, evt.renderedPosition));
+  cy.on('mouseout', 'edge.skeleton', hideTip);
+  cy.on('viewport', hideTip);
+  container.addEventListener('mouseleave', hideTip);
 
   /** The canvas changed size (window resize, phone <-> desktop): re-fit,
    * unless the reader has zoomed or panned by hand since the last fit.
@@ -1276,6 +1685,6 @@ export function createGraphController(opts) {
   }
 
   return {
-    show, wholeMap, setHops, setShowAkhc, zoomBy, fit: () => fitView(true), zoomToSelection, resize, refreshStyle, cy, index,
+    show, wholeMap, setHops, setShowAkhc, setEssentials, isEssentials: () => st.essentials, zoomBy, fit: () => fitView(true), zoomToSelection, resize, refreshStyle, cy, index,
   };
 }

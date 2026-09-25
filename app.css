@@ -672,3 +672,42 @@ body[data-resizing] .pane { pointer-events: none; }
   html, body { overflow: hidden; }
   .pane--graph, .cy-canvas { overflow: hidden; }
 }
+
+/* ---------- Essentials / Everything (tasks/p17-essentials.md) ---------- */
+.graph-tiers { display: inline-flex; }
+.graph-tiers .graph-btn:first-child { border-radius: 999px 0 0 999px; }
+.graph-tiers .graph-btn:last-child { border-radius: 0 999px 999px 0; margin-left: -1px; }
+/* The legend follows the view; before the graph script runs, the old one shows. */
+.graph-legend__row--essentials, .graph-legend__key--essentials { display: none !important; }
+.pane--graph[data-graph-tiers="essentials"] .graph-legend__row--essentials { display: flex !important; }
+.pane--graph[data-graph-tiers="essentials"] .graph-legend__key--essentials { display: inline-flex !important; }
+.pane--graph[data-graph-tiers="essentials"] .graph-legend__row--everything { display: none !important; }
+/* The thick skeleton arrow is drawn only on the whole map. */
+.pane--graph[data-graph-tiers="essentials"]:not([data-graph-mode="map"]) .graph-legend__key--essentials { display: none !important; }
+.legend-swatch--major { background: var(--surface); border: 2px solid var(--accent); width: 12px; height: 12px; }
+.legend-swatch--definition { background: var(--surface-2); border: 1px solid var(--border); }
+.legend-arrow {
+  display: inline-block; position: relative; width: 22px; height: 3px; background: var(--text);
+  border-radius: 2px; margin-right: 2px;
+}
+.legend-arrow::after {
+  content: ""; position: absolute; right: -2px; top: -4px;
+  border-left: 7px solid var(--text); border-top: 5.5px solid transparent; border-bottom: 5.5px solid transparent;
+}
+/* A skeleton arrow's hover card: the hidden results it passes through. */
+.graph-tip {
+  position: absolute; z-index: 5; max-width: 320px; pointer-events: none;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 6px 10px; font-size: 12.5px; line-height: 1.4;
+}
+.graph-tip[hidden] { display: none; }
+/* Phone outline: major results stand out. */
+.outline .outline__major > button { font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
+.outline__tag {
+  margin-left: 6px; font-size: 11px; font-weight: 600; color: var(--accent-strong);
+  border: 1px solid var(--accent); border-radius: 999px; padding: 0 6px; white-space: nowrap;
+}
+.outline .outline__background > button { color: var(--text-dim); font-size: 0.93em; }
+@media (max-width: 700px) {
+  .graph-toolbar .graph-tiers { display: none; }
+}
