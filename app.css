@@ -275,7 +275,7 @@ button.topbar__brand {
    -- fill, border colour and border style match exactly (tasks/p18-legend.md). */
 .legend-swatch--theorem { background: var(--accent); border: 1px solid var(--accent-strong); }
 .legend-swatch--section { background: var(--surface-2); border: 1px solid var(--text-faint); }
-.legend-swatch--subsection { background: var(--surface); border: 1px dashed var(--text-faint); }
+.legend-swatch--subsection { background: var(--surface); border: 1.5px dashed var(--text-dim); width: 12px; height: 12px; }
 .legend-swatch--result { background: var(--accent-2-tint); border: 1px solid var(--accent-2); }
 .legend-swatch--ext { background: var(--surface); border: 1px dotted var(--text-faint); }
 
@@ -744,25 +744,21 @@ body[data-resizing] .pane { pointer-events: none; }
   display: inline-block; width: 12px; height: 12px; border-radius: 3px;
   background: var(--surface); border: 2px solid var(--focus-ring);
 }
-/* A line sample: border-top (not background) so dashed/dotted modifiers work. */
+/* A line sample drawn like the graph's one arrow style (site/graphnav.mjs). */
 .legend-arrow {
   display: inline-block; position: relative; width: 22px; height: 0; margin-right: 6px;
-  border-top: 2.6px solid var(--text); vertical-align: middle;
+  border-top: 1.6px solid var(--text-dim); vertical-align: middle;
 }
 .legend-arrow::after {
-  content: ""; position: absolute; right: -1px; top: -4.5px;
-  border-left: 6px solid var(--text); border-top: 4.5px solid transparent; border-bottom: 4.5px solid transparent;
+  content: ""; position: absolute; right: -1px; top: -4px;
+  border-left: 6px solid var(--text-dim); border-top: 4px solid transparent; border-bottom: 4px solid transparent;
 }
-.legend-arrow--dashed, .legend-arrow--dotted, .legend-arrow--mutual { border-top-width: 1.4px; border-color: var(--text-faint); }
-.legend-arrow--dashed { border-top-style: dashed; }
-.legend-arrow--dotted { border-top-style: dotted; }
-.legend-arrow--dashed::after, .legend-arrow--dotted::after, .legend-arrow--mutual::after { border-left-color: var(--text-faint); }
+.legend-arrow--hl { border-top: 2.4px solid var(--accent); }
+.legend-arrow--hl::after { border-left-color: var(--accent); }
 .legend-arrow--mutual::before {
-  content: ""; position: absolute; left: -1px; top: -4.5px;
-  border-right: 6px solid var(--text-faint); border-top: 4.5px solid transparent; border-bottom: 4.5px solid transparent;
+  content: ""; position: absolute; left: -1px; top: -4px;
+  border-right: 6px solid var(--text-dim); border-top: 4px solid transparent; border-bottom: 4px solid transparent;
 }
-.legend-arrow--bg { border-top-width: 1px; border-top-style: dashed; border-color: var(--border); }
-.legend-arrow--bg::after { border-left-color: var(--border); border-top-width: 3.5px; border-bottom-width: 3.5px; top: -3.5px; }
 /* A skeleton arrow's hover card: the hidden results it passes through. */
 .graph-tip {
   position: absolute; z-index: 5; max-width: 320px; pointer-events: none;

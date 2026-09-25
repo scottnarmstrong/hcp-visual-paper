@@ -984,9 +984,9 @@ function buildStylesheet(cssVar, fontGen = 0) {
       'underlay-color': cssVar('--focus-ring'), 'underlay-opacity': 0.16, 'underlay-padding': 6, 'underlay-shape': 'round-rectangle',
     } },
     { selector: 'edge', style: {
-      width: 1.4,
-      'line-color': cssVar('--text-faint'),
-      'target-arrow-color': cssVar('--text-faint'),
+      width: 1.6,
+      'line-color': cssVar('--text-dim'),
+      'target-arrow-color': cssVar('--text-dim'),
       'target-arrow-shape': 'triangle',
       'arrow-scale': 0.9,
       'curve-style': 'bezier',
@@ -994,37 +994,22 @@ function buildStylesheet(cssVar, fontGen = 0) {
       'transition-property': 'opacity, line-color, width',
       'transition-duration': '150ms',
     } },
-    { selector: 'edge[count]', style: { width: 'mapData(count, 1, 14, 1.1, 3.4)', opacity: 'mapData(count, 1, 10, 0.4, 0.85)' } },
-    { selector: 'edge.mutual', style: { 'source-arrow-shape': 'triangle', 'source-arrow-color': cssVar('--text-faint') } },
-    { selector: 'edge.ref', style: { 'line-style': 'dashed', 'line-dash-pattern': [5, 3] } },
-    { selector: 'edge.cite', style: { 'line-style': 'dotted' } },
+    // One arrow style for every dependency ("A is used in the proof of B"): no width,
+    // shade or dash variations -- the authors found unexplained variations confusing.
+    // Only the orange hover/selection highlight and fading differ (both in the legend).
+    { selector: 'edge.mutual', style: { 'source-arrow-shape': 'triangle', 'source-arrow-color': cssVar('--text-dim') } },
     // Edges at the focus bend on a shared trunk next to it: out of the focus
     // (to what uses it) turn near their source, into it (from what it
     // uses) near their target.
     { selector: 'edge.f-out', style: { 'curve-style': 'taxi', 'taxi-direction': 'rightward', 'taxi-turn': '30px', 'taxi-radius': 10, 'taxi-turn-min-distance': 6 } },
     { selector: 'edge.f-in', style: { 'curve-style': 'taxi', 'taxi-direction': 'rightward', 'taxi-turn': '-30px', 'taxi-radius': 10, 'taxi-turn-min-distance': 6 } },
     { selector: 'edge.layout-helper', style: { visibility: 'hidden', events: 'no' } },
-    { selector: 'edge.ess-edge', style: { width: 1.8, opacity: 0.8, 'line-color': cssVar('--text-dim'), 'target-arrow-color': cssVar('--text-dim'), 'source-arrow-color': cssVar('--text-dim') } },
-    // Dark grey, not near-black (tasks/p18-legend.md), and thinner (~2px) now
-    // that all 28 direct uses are drawn -- still clearly heavier than a
-    // supporting arrow (edge.ess-edge, 1.8) or the plain default (edge, 1.4).
-    // Hovering a box's own arrows highlights them (edge.hl, below) instead.
-    // Straight by default; only .skeleton.bowed (layoutOverview, set when a
-    // straight line would run through a third major's box -- e.g. Prop 2.1 ->
-    // Theorem A, roughly in line with Prop 5.2 -> Theorem A) actually bows,
-    // so it stays visible as its own arrow instead of running invisibly
-    // behind that shorter chain.
-    { selector: 'edge.skeleton', style: {
-      width: 2, 'line-color': cssVar('--text-dim'), 'target-arrow-color': cssVar('--text-dim'), 'arrow-scale': 1, opacity: 0.85,
-    } },
+    // A main-results arrow is straight unless a straight line would run through a
+    // third box (layoutOverview sets .bowed), so it stays visible as its own arrow.
     { selector: 'edge.skeleton.bowed', style: {
       'curve-style': 'unbundled-bezier', 'control-point-distances': [100], 'control-point-weights': [0.5],
     } },
-    { selector: 'edge.bg-edge', style: {
-      width: 0.9, 'line-style': 'dashed', 'line-dash-pattern': [4, 3], 'line-color': cssVar('--border'),
-      'target-arrow-color': cssVar('--border'), 'arrow-scale': 0.7, opacity: 0.9,
-    } },
-    { selector: 'edge.ctx-edge', style: { opacity: 0.4, width: 1.2 } },
+    { selector: 'edge.ctx-edge', style: { opacity: 0.4 } },
     { selector: 'node.faded', style: { opacity: 0.25 } },
     { selector: 'edge.faded', style: { opacity: 0.1 } },
     { selector: 'edge.hl', style: {

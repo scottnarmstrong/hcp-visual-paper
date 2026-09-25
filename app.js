@@ -199,10 +199,9 @@ function howToReadGraphHtml() {
         <li><i class="legend-swatch legend-swatch--akhc" aria-hidden="true"></i>[AK25] item: quoted from the earlier paper.</li>
         <li><i class="legend-swatch legend-swatch--background" aria-hidden="true"></i>Background node: a fact the paper takes from [AK25] without stating it.</li>
         <li><i class="legend-swatch legend-swatch--lean" aria-hidden="true"></i>Lean check: covered by the formalization.</li>
-        <li><i class="legend-arrow" aria-hidden="true"></i>Thick arrow: a major result used directly to prove another.</li>
-        <li><i class="legend-arrow legend-arrow--dashed" aria-hidden="true"></i>Dashed arrow: uses a definition.</li>
-        <li><i class="legend-arrow legend-arrow--dotted" aria-hidden="true"></i>Dotted arrow: cites [AK25].</li>
-        <li><i class="legend-arrow legend-arrow--mutual" aria-hidden="true"></i>Two-headed arrow: each result uses the other.</li>
+        <li><i class="legend-arrow" aria-hidden="true"></i>Arrow A &rarr; B: A is used in the proof (or statement, or definition) of B. Every arrow is drawn the same way.</li>
+        <li><i class="legend-arrow legend-arrow--hl" aria-hidden="true"></i>Orange arrows: the arrows of the box you point at or have selected.</li>
+        <li><i class="legend-arrow legend-arrow--mutual" aria-hidden="true"></i>Two-headed arrow (full graph, closed sections): each section uses something in the other.</li>
         <li><i class="legend-outline" aria-hidden="true"></i>Outline: the selected or focused result.</li>
       </ul>
       <p>Main results (the default) shows only the major results and the direct uses between them; Full graph shows every result, definition and link.</p>
