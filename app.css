@@ -277,7 +277,7 @@ button.topbar__brand {
 .legend-swatch--section { background: var(--surface-2); border: 1px solid var(--text-faint); }
 .legend-swatch--subsection { background: var(--surface); border: 1.5px dashed var(--text-dim); width: 12px; height: 12px; }
 .legend-swatch--result { background: var(--accent-2-tint); border: 1px solid var(--accent-2); }
-.legend-swatch--ext { background: var(--surface); border: 1px dotted var(--text-faint); }
+.legend-swatch--ext { background: var(--surface); border: 2px dotted var(--text-faint); }
 
 /* Graph controls (tasks/p8-graph-navigation.md): view switch and hint at the
    top left, zoom at the top right. */
@@ -724,7 +724,7 @@ body[data-resizing] .pane { pointer-events: none; }
 .graph-legend__row--skeleton-arrow,
 .graph-legend__row--sections,
 .graph-legend__row--context,
-.graph-legend__row--overlays { display: none; }
+.graph-legend__row--akhc { display: none; }
 /* The thick skeleton arrow is drawn only on the Main results whole map. */
 .pane--graph[data-graph-tiers="essentials"][data-graph-mode="map"] .graph-legend__row--skeleton-arrow { display: flex; }
 /* Definitions, external inputs, [AK25] items, Background nodes, a selection/focus
@@ -732,9 +732,7 @@ body[data-resizing] .pane { pointer-events: none; }
    results map or opened section never draws any of them) -- everywhere else
    (a focus, Full graph) they can. */
 .pane--graph[data-graph-tiers="everything"] .graph-legend__row--context,
-.pane--graph[data-graph-mode="focus"] .graph-legend__row--context,
-.pane--graph[data-graph-tiers="everything"] .graph-legend__row--overlays,
-.pane--graph[data-graph-mode="focus"] .graph-legend__row--overlays { display: flex; }
+.pane--graph[data-graph-mode="focus"] .graph-legend__row--context { display: flex; }
 /* Closed section/subsection boxes are drawn only in Full graph, and not inside a
    focus (a focus never shows a raw section or subsection). */
 .pane--graph[data-graph-tiers="everything"]:not([data-graph-mode="focus"]) .graph-legend__row--sections { display: flex; }
@@ -776,3 +774,7 @@ body[data-resizing] .pane { pointer-events: none; }
 @media (max-width: 700px) {
   .graph-toolbar .graph-tiers { display: none; }
 }
+
+/* [AK25] items and the facts taken from [AK25] appear only with "Show [AK25] links" on. */
+.pane--graph[data-akhc-shown="true"] .graph-legend__row--akhc { display: flex; }
+.graph-legend__help { background: none; border: 0; padding: 0; font: inherit; font-size: 12px; color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }

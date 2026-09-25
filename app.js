@@ -189,20 +189,19 @@ function howToReadGraphHtml() {
     <div class="welcome-panel__how-to-read" id="how-to-read-graph">
       <h3 class="section-label">How to read the graph</h3>
       <ul class="how-to-read__list">
-        <li><i class="legend-swatch legend-swatch--theorem" aria-hidden="true"></i>Theorem: filled.</li>
-        <li><i class="legend-swatch legend-swatch--major" aria-hidden="true"></i>Major result: thick border.</li>
-        <li><i class="legend-swatch legend-swatch--result" aria-hidden="true"></i>Supporting result: pale tint.</li>
-        <li><i class="legend-swatch legend-swatch--definition" aria-hidden="true"></i>Definition: small, grey.</li>
-        <li><i class="legend-swatch legend-swatch--section" aria-hidden="true"></i>Section: grey box.</li>
-        <li><i class="legend-swatch legend-swatch--subsection" aria-hidden="true"></i>Subsection: white, dashed border.</li>
-        <li><i class="legend-swatch legend-swatch--ext" aria-hidden="true"></i>External input: dotted border, italic.</li>
-        <li><i class="legend-swatch legend-swatch--akhc" aria-hidden="true"></i>[AK25] item: quoted from the earlier paper.</li>
-        <li><i class="legend-swatch legend-swatch--background" aria-hidden="true"></i>Background node: a fact the paper takes from [AK25] without stating it.</li>
-        <li><i class="legend-swatch legend-swatch--lean" aria-hidden="true"></i>Lean check: covered by the formalization.</li>
+        <li><i class="legend-swatch legend-swatch--theorem" aria-hidden="true"></i>Theorem (A–D): filled orange.</li>
+        <li><i class="legend-swatch legend-swatch--major" aria-hidden="true"></i>Major result: a proposition, or one of two key steps (the adapted cube bound, Lemma 4.2); orange border.</li>
+        <li><i class="legend-swatch legend-swatch--result" aria-hidden="true"></i>Supporting result: a lemma, labelled estimate or claim inside a proof; pale green.</li>
+        <li><i class="legend-swatch legend-swatch--definition" aria-hidden="true"></i>Definition or assumption: small, grey.</li>
+        <li><i class="legend-swatch legend-swatch--section" aria-hidden="true"></i>Section, closed: click to open it.</li>
+        <li><i class="legend-swatch legend-swatch--subsection" aria-hidden="true"></i>Subsection: a group of results, not a result; white with a dashed border.</li>
+        <li><i class="legend-swatch legend-swatch--ext" aria-hidden="true"></i>Another paper the proofs cite, e.g. JK95.</li>
+        <li><i class="legend-swatch legend-swatch--akhc" aria-hidden="true"></i>A result quoted from the earlier paper [AK25] (only with “Show [AK25] links”).</li>
+        <li><i class="legend-swatch legend-swatch--background" aria-hidden="true"></i>A fact the paper takes from [AK25] without stating it, written out here and marked “Background” (only with “Show [AK25] links”).</li>
+        <li><i class="legend-swatch legend-swatch--lean" aria-hidden="true"></i>Green check: formalized in Lean.</li>
         <li><i class="legend-arrow" aria-hidden="true"></i>Arrow A &rarr; B: A is used in the proof (or statement, or definition) of B. Every arrow is drawn the same way.</li>
         <li><i class="legend-arrow legend-arrow--hl" aria-hidden="true"></i>Orange arrows: the arrows of the box you point at or have selected.</li>
         <li><i class="legend-arrow legend-arrow--mutual" aria-hidden="true"></i>Two-headed arrow (full graph, closed sections): each section uses something in the other.</li>
-        <li><i class="legend-outline" aria-hidden="true"></i>Outline: the selected or focused result.</li>
       </ul>
       <p>Main results (the default) shows only the major results and the direct uses between them; Full graph shows every result, definition and link.</p>
       <p>The map shows sections and results as boxes joined by arrows; clicking a result switches to a columns view instead, with what it uses in the left columns and what uses it in the right ones.</p>

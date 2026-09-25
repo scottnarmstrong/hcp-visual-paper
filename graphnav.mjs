@@ -964,7 +964,7 @@ function buildStylesheet(cssVar, fontGen = 0) {
     // a Background node keeps its own colour even where it is also sized/dimmed as
     // background context (e.g. flanking a focus) -- only a plain definition, with no
     // colour of its own, actually shows ess-background's grey.
-    { selector: 'node.lvl-ext', style: { 'border-style': 'dotted', 'font-style': 'italic' } },
+    { selector: 'node.lvl-ext', style: { 'border-style': 'dotted', 'border-width': 2, 'border-color': cssVar('--text-faint'), 'background-color': cssVar('--surface'), 'font-style': 'italic' } },
     { selector: 'node.cluster-akhc', style: { 'background-color': cssVar('--akhc-tint'), 'border-color': cssVar('--akhc'), 'border-style': 'dotted' } },
     { selector: 'node.kind-akhc', style: { 'background-color': cssVar('--akhc-tint'), 'border-color': cssVar('--akhc'), 'border-style': 'dotted', 'font-style': 'normal' } },
     { selector: 'node.kind-background', style: { 'background-color': cssVar('--background-node-tint'), 'border-color': cssVar('--background-node'), 'border-style': 'dashed', 'font-style': 'normal' } },
@@ -1672,6 +1672,7 @@ export function createGraphController(opts) {
 
   function syncControls() {
     if (pane) pane.dataset.legendCollapsed = String(st.legendCollapsed);
+    if (pane) pane.dataset.akhcShown = String(!!st.showAkhc);
     if (legendToggle) legendToggle.setAttribute('aria-expanded', String(!st.legendCollapsed));
     if (tiersGroup) {
       tiersGroup.querySelectorAll('[data-graph-action^="view-"]').forEach((b) => {
