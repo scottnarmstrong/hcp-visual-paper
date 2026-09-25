@@ -937,7 +937,7 @@ function buildStylesheet(cssVar, fontGen = 0) {
     { selector: 'node.band-label', style: {
       shape: 'rectangle', 'background-opacity': 1, 'background-color': cssVar('--bg'), 'border-width': 0,
       width: 'label', height: 'label', padding: '3px', 'font-size': 13, 'font-weight': 600,
-      color: cssVar('--text-dim'), 'text-max-width': '120px', 'text-justify': 'right', 'z-index': 10,
+      color: cssVar('--text-dim'), 'text-max-width': '120px', 'z-index': 10,
     } },
     { selector: 'node.band', style: {
       'background-color': cssVar('--surface'), 'background-opacity': 0.5, 'border-width': 1, 'border-style': 'solid',

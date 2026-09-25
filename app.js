@@ -524,11 +524,41 @@ function figurePopoutMountEl(card) {
  * close button, a backdrop click, or -- in a real browser -- Esc/the
  * native `cancel` default action): moves the mount and caption back to
  * exactly where they came from and returns focus to whatever opened it. */
+/** Enlarged figure: shrink it to fit its whole height in the dialog. The figure
+ * keeps its wide layout; a CSS scale (not a narrower width, which makes some
+ * figures switch to a taller stacked layout) shrinks the drawing, never below its
+ * width in the card; the negative bottom margin gives back the space it no
+ * longer takes. The caption and anything that still does not fit (a phone) scroll. */
+function fitFigurePopout() {
+  const { mount } = figurePopoutState;
+  const box = document.getElementById('figure-modal-figure');
+  if (!mount || !box) return;
+  mount.style.transform = '';
+  mount.style.marginBottom = '';
+  // The drawing fills the dialog's height; a long caption follows below it.
+  const { width: w, height: h } = mount.getBoundingClientRect();
+  if (h <= box.clientHeight + 1 || w <= 0) return;
+  const k = Math.max((figurePopoutState.cardWidth || 0) / w, (box.clientHeight - 2) / h);
+  if (k >= 1) return;
+  mount.style.transformOrigin = 'top center';
+  mount.style.transform = `scale(${k})`;
+  mount.style.marginBottom = `${-(1 - k) * h}px`;
+}
+function refitFigurePopout() {
+  if (!figurePopoutState.mount) return;
+  // Twice: after the figure's own layout for the dialog's width, and once more
+  // after any re-layout that triggers.
+  requestAnimationFrame(() => requestAnimationFrame(fitFigurePopout));
+  setTimeout(fitFigurePopout, 400);
+}
+
 function closeFigurePopoutNow() {
   const {
     mount, caption, placeholder, opener,
   } = figurePopoutState;
   if (!mount) return;
+  mount.style.transform = '';
+  mount.style.marginBottom = '';
   placeholder.replaceWith(...(caption ? [mount, caption] : [mount]));
   figurePopoutState.mount = null;
   figurePopoutState.caption = null;
@@ -555,6 +585,7 @@ function openFigurePopout(card, opener) {
   const fig = state.data.figures && state.data.figures[id];
   document.getElementById('figure-modal-title').textContent = fig ? plainText(fig.titleHtml) : '';
 
+  figurePopoutState.cardWidth = mount.getBoundingClientRect().width;
   const placeholder = document.createComment('figure-popout-slot');
   mount.before(placeholder);
   const target = document.getElementById('figure-modal-figure');
@@ -569,6 +600,7 @@ function openFigurePopout(card, opener) {
   const dialog = document.getElementById('figure-modal');
   if (typeof dialog.showModal === 'function') dialog.showModal();
   else dialog.setAttribute('open', ''); // jsdom: no showModal -- reflect `open` so the DOM move is still checkable
+  refitFigurePopout();
 }
 
 /** Interactive controls a click on the figure itself must NOT pop out --
@@ -603,6 +635,7 @@ function initFigurePopouts() {
   // there bubbles as a click on the dialog itself (spec behavior).
   dialog.addEventListener('click', (e) => { if (e.target === dialog) requestCloseFigurePopout(); });
   dialog.addEventListener('close', closeFigurePopoutNow);
+  window.addEventListener('resize', refitFigurePopout);
 }
 
 function renderStructuralNode(node) {

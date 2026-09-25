@@ -503,10 +503,9 @@ button.topbar__brand {
 /* WIDTH FIRST (tasks/p9b follow-up): inside the dialog a figure takes the
    dialog's full width -- a figure that picks its layout from its own width
    (measuredWidth + ResizeObserver) re-lays out to its WIDE layout there --
-   and keeps its natural height; `.figure-modal__figure` (overflow:auto,
-   above) scrolls vertically when that is taller than the dialog. Nothing
-   is shrunk to fit the dialog's height: that made a tall figure tiny, its
-   labels smaller than in the inline card.
+   and keeps its natural height; site/app.js (fitFigurePopout) then scales the
+   drawing down to the dialog's height when it is taller -- never below its
+   size in the card -- and the caption scrolls below it.
    A figure module either wraps itself in `.d3-figure` (a flex column) or
    appends loose children (banner, controls, a host div holding the one
    <svg>) straight into the mount: stack them, full width, natural height. */
